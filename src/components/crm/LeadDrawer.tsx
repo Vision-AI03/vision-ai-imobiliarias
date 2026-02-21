@@ -5,10 +5,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Mail, MailCheck, MessageSquare, CheckCheck, ExternalLink, Calendar, Building2, User, Globe, Linkedin } from "lucide-react";
+import { Mail, MailCheck, MessageSquare, CheckCheck, ExternalLink, Calendar, Building2, User, Globe, Linkedin, Sparkles, Loader2, Send } from "lucide-react";
 import { format } from "date-fns";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Lead = Tables<"leads">;
@@ -41,10 +42,16 @@ interface LeadDrawerProps {
 export default function LeadDrawer({ lead, open, onClose, onStatusChange }: LeadDrawerProps) {
   const [anotacoes, setAnotacoes] = useState("");
   const [comunicacoes, setComunicacoes] = useState<Tables<"comunicacoes">[]>([]);
+  const [enriching, setEnriching] = useState(false);
+  const [generatingEmail, setGeneratingEmail] = useState(false);
+  const [emailDraft, setEmailDraft] = useState<{ assunto: string; conteudo: string } | null>(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (lead) {
       setAnotacoes(lead.mensagem_original || "");
+      setEmailDraft(null);
       fetchComunicacoes(lead.id);
     }
   }, [lead]);
@@ -61,6 +68,84 @@ export default function LeadDrawer({ lead, open, onClose, onStatusChange }: Lead
   async function salvarAnotacoes() {
     if (!lead) return;
     await supabase.from("leads").update({ mensagem_original: anotacoes }).eq("id", lead.id);
+  }
+
+  async function handleEnrichLead() {
+    if (!lead) return;
+    setEnriching(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("enrich-lead", {
+        body: { lead_id: lead.id },
+      });
+      if (error || data?.error) {
+        toast({ title: "Erro no enriquecimento", description: error?.message || data?.error, variant: "destructive" });
+      } else {
+        toast({ title: "Lead enriquecido com sucesso!", description: `Site: ${data.sources?.site_scraped ? "✓" : "✗"} | Busca: ${data.sources?.search_done ? "✓" : "✗"} | LinkedIn: ${data.sources?.linkedin_scraped ? "✓" : "✗"}` });
+        onStatusChange(lead.id, "enriquecido");
+      }
+    } catch (e) {
+      toast({ title: "Erro ao enriquecer lead", variant: "destructive" });
+    }
+    setEnriching(false);
+  }
+
+  async function handleGenerateEmail() {
+    if (!lead) return;
+    setGeneratingEmail(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-email", {
+        body: { lead_id: lead.id },
+      });
+      if (error || data?.error) {
+        toast({ title: "Erro ao gerar email", description: error?.message || data?.error, variant: "destructive" });
+      } else {
+        setEmailDraft(data.data);
+        toast({ title: "Rascunho de email gerado!" });
+      }
+    } catch (e) {
+      toast({ title: "Erro ao gerar email", variant: "destructive" });
+    }
+    setGeneratingEmail(false);
+  }
+
+  async function handleSendDraft() {
+    if (!lead || !emailDraft) return;
+    setSendingEmail(true);
+
+    const htmlContent = `
+      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+        <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:20px;text-align:center;">
+          <span style="color:#fff;font-weight:bold;font-size:20px;">Vision AI</span>
+        </div>
+        <div style="padding:24px;background:#fff;">
+          <h2 style="margin:0 0 16px;">${emailDraft.assunto}</h2>
+          <div style="white-space:pre-wrap;color:#333;">${emailDraft.conteudo}</div>
+        </div>
+        <div style="background:#f5f5f5;padding:12px;text-align:center;font-size:11px;color:#888;">
+          Vision AI — Inteligência Artificial para o seu negócio
+        </div>
+      </div>`;
+
+    const { data, error } = await supabase.functions.invoke("send-email", {
+      body: { to: lead.email, name: lead.nome, subject: emailDraft.assunto, html: htmlContent },
+    });
+
+    if (error || data?.error) {
+      toast({ title: "Erro ao enviar", description: error?.message || data?.error, variant: "destructive" });
+    } else {
+      await supabase.from("comunicacoes").insert({
+        lead_id: lead.id, tipo: "email", direcao: "enviado",
+        assunto: emailDraft.assunto, conteudo: emailDraft.conteudo, status: "enviado",
+      });
+      await supabase.from("leads").update({
+        email_enviado: true, data_email_enviado: new Date().toISOString(),
+      }).eq("id", lead.id);
+
+      toast({ title: "Email enviado com sucesso!" });
+      setEmailDraft(null);
+      fetchComunicacoes(lead.id);
+    }
+    setSendingEmail(false);
   }
 
   if (!lead) return null;
@@ -170,7 +255,61 @@ export default function LeadDrawer({ lead, open, onClose, onStatusChange }: Lead
 
             <Separator />
 
-            {/* Timeline */}
+            {/* Actions: Enrich + Generate Email */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Ações Automáticas</h4>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleEnrichLead}
+                  disabled={enriching}
+                  className="gap-1.5 text-xs"
+                >
+                  {enriching ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                  {enriching ? "Enriquecendo..." : "Enriquecer com IA"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleGenerateEmail}
+                  disabled={generatingEmail}
+                  className="gap-1.5 text-xs"
+                >
+                  {generatingEmail ? <Loader2 className="h-3 w-3 animate-spin" /> : <Mail className="h-3 w-3" />}
+                  {generatingEmail ? "Gerando..." : "Gerar Email com IA"}
+                </Button>
+              </div>
+
+              {/* Email Draft Preview */}
+              {emailDraft && (
+                <div className="rounded-lg border border-primary/30 overflow-hidden mt-2">
+                  <div className="bg-primary/10 px-3 py-2 flex items-center justify-between">
+                    <span className="text-xs font-medium text-primary">Rascunho de Email</span>
+                    <div className="flex gap-1.5">
+                      <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setEmailDraft(null)}>
+                        Descartar
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="h-6 text-xs gradient-primary text-primary-foreground gap-1"
+                        onClick={handleSendDraft}
+                        disabled={sendingEmail}
+                      >
+                        <Send className="h-3 w-3" />
+                        {sendingEmail ? "Enviando..." : "Enviar"}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="p-3 space-y-1 text-xs">
+                    <p className="font-medium">{emailDraft.assunto}</p>
+                    <p className="text-muted-foreground whitespace-pre-wrap">{emailDraft.conteudo}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <Separator />
             <div className="space-y-2">
               <h4 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Timeline de Interações</h4>
               {comunicacoes.length === 0 ? (
