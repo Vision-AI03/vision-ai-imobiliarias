@@ -219,7 +219,7 @@ Retorne um JSON com:
   "resumo_empresa": "resumo sobre a empresa e sua atuação",
   "motivo_score": "justificativa do score",
   "score": número de 0-100 (potencial como cliente),
-  "prioridade_contato": "baixa|media|alta|urgente",
+  "prioridade_contato": "baixa|media|alta|imediata",
   "linkedin_cargo": "cargo do lead se encontrado",
   "site_titulo": "título do site",
   "site_descricao": "descrição do site"
