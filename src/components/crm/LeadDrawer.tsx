@@ -37,9 +37,10 @@ interface LeadDrawerProps {
   open: boolean;
   onClose: () => void;
   onStatusChange: (leadId: string, newStatus: string) => void;
+  onLeadUpdate?: (lead: Lead) => void;
 }
 
-export default function LeadDrawer({ lead, open, onClose, onStatusChange }: LeadDrawerProps) {
+export default function LeadDrawer({ lead, open, onClose, onStatusChange, onLeadUpdate }: LeadDrawerProps) {
   const [anotacoes, setAnotacoes] = useState("");
   const [comunicacoes, setComunicacoes] = useState<Tables<"comunicacoes">[]>([]);
   const [enriching, setEnriching] = useState(false);
@@ -80,8 +81,19 @@ export default function LeadDrawer({ lead, open, onClose, onStatusChange }: Lead
       if (error || data?.error) {
         toast({ title: "Erro no enriquecimento", description: error?.message || data?.error, variant: "destructive" });
       } else {
-        toast({ title: "Lead enriquecido com sucesso!", description: `Site: ${data.sources?.site_scraped ? "✓" : "✗"} | Busca: ${data.sources?.search_done ? "✓" : "✗"} | LinkedIn: ${data.sources?.linkedin_scraped ? "✓" : "✗"}` });
-        onStatusChange(lead.id, "enriquecido");
+        toast({
+          title: "Lead enriquecido com sucesso!",
+          description: `Site: ${data.sources?.site_scraped ? "✓" : "✗"} | Busca: ${data.sources?.search_done ? "✓" : "✗"} | LinkedIn: ${data.sources?.linkedin_scraped ? "✓" : "✗"} | Instagram: ${data.sources?.instagram_scraped ? "✓" : "✗"}`,
+        });
+        // Fetch updated lead data from DB and propagate
+        const { data: updatedLead } = await supabase
+          .from("leads")
+          .select("*")
+          .eq("id", lead.id)
+          .maybeSingle();
+        if (updatedLead && onLeadUpdate) {
+          onLeadUpdate(updatedLead);
+        }
       }
     } catch (e) {
       toast({ title: "Erro ao enriquecer lead", variant: "destructive" });
