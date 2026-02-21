@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Plus, FileText, Upload } from "lucide-react";
+import { Plus, FileText, Upload, Sparkles, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format, addMonths } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -56,6 +56,7 @@ export default function Contratos() {
   const [diaVencimento, setDiaVencimento] = useState("10");
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [extracting, setExtracting] = useState(false);
 
   useEffect(() => {
     fetchContratos();
@@ -72,7 +73,49 @@ export default function Contratos() {
     setClienteNome(""); setClienteEmail(""); setClienteTelefone("");
     setTipoServico("agente_ia"); setValorTotal(""); setNumParcelas("1");
     setValorEntrada(""); setValorRecorrencia(""); setDiaVencimento("10");
-    setPdfFile(null);
+    setPdfFile(null); setExtracting(false);
+  }
+
+  async function handlePdfUpload(file: File) {
+    setPdfFile(file);
+    setExtracting(true);
+
+    try {
+      // Convert to base64
+      const buffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64 = btoa(binary);
+
+      const { data, error } = await supabase.functions.invoke("extract-contract-data", {
+        body: { pdf_base64: base64, file_name: file.name },
+      });
+
+      if (error || data?.error) {
+        toast({ title: "Erro na extração com IA", description: error?.message || data?.error, variant: "destructive" });
+        setExtracting(false);
+        return;
+      }
+
+      const d = data.data;
+      if (d.cliente_nome) setClienteNome(d.cliente_nome);
+      if (d.cliente_email) setClienteEmail(d.cliente_email);
+      if (d.cliente_telefone) setClienteTelefone(d.cliente_telefone);
+      if (d.tipo_servico) setTipoServico(d.tipo_servico);
+      if (d.valor_total != null) setValorTotal(String(d.valor_total));
+      if (d.num_parcelas != null) setNumParcelas(String(d.num_parcelas));
+      if (d.valor_entrada != null) setValorEntrada(String(d.valor_entrada));
+      if (d.valor_recorrencia != null) setValorRecorrencia(String(d.valor_recorrencia));
+      if (d.dia_vencimento != null) setDiaVencimento(String(d.dia_vencimento));
+
+      toast({ title: "Dados extraídos com IA!", description: "Revise os campos preenchidos automaticamente." });
+    } catch (e) {
+      toast({ title: "Erro ao processar PDF", variant: "destructive" });
+    }
+    setExtracting(false);
   }
 
   async function handleSalvar() {
@@ -195,12 +238,24 @@ export default function Contratos() {
                 <div className="flex items-center gap-2">
                   <label className="flex-1 cursor-pointer">
                     <div className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-border p-4 hover:border-primary/50 transition-colors">
-                      <Upload className="h-5 w-5 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">
-                        {pdfFile ? pdfFile.name : "Clique para enviar PDF"}
-                      </span>
+                      {extracting ? (
+                        <>
+                          <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                          <span className="text-sm text-primary">Extraindo dados com IA...</span>
+                        </>
+                      ) : (
+                        <>
+                          {pdfFile ? <Sparkles className="h-5 w-5 text-primary" /> : <Upload className="h-5 w-5 text-muted-foreground" />}
+                          <span className="text-sm text-muted-foreground">
+                            {pdfFile ? pdfFile.name : "Envie um PDF para preencher automaticamente"}
+                          </span>
+                        </>
+                      )}
                     </div>
-                    <input type="file" accept=".pdf" className="hidden" onChange={e => setPdfFile(e.target.files?.[0] || null)} />
+                    <input type="file" accept=".pdf" className="hidden" onChange={e => {
+                      const f = e.target.files?.[0];
+                      if (f) handlePdfUpload(f);
+                    }} />
                   </label>
                 </div>
               </div>
