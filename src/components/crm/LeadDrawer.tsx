@@ -281,11 +281,11 @@ export default function LeadDrawer({ lead, open, onClose, onStatusChange }: Lead
                 </Button>
               </div>
 
-              {/* Email Draft Preview */}
+              {/* Email Draft - Editable */}
               {emailDraft && (
                 <div className="rounded-lg border border-primary/30 overflow-hidden mt-2">
                   <div className="bg-primary/10 px-3 py-2 flex items-center justify-between">
-                    <span className="text-xs font-medium text-primary">Rascunho de Email</span>
+                    <span className="text-xs font-medium text-primary">Rascunho de Email (editável)</span>
                     <div className="flex gap-1.5">
                       <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setEmailDraft(null)}>
                         Descartar
@@ -301,9 +301,25 @@ export default function LeadDrawer({ lead, open, onClose, onStatusChange }: Lead
                       </Button>
                     </div>
                   </div>
-                  <div className="p-3 space-y-1 text-xs">
-                    <p className="font-medium">{emailDraft.assunto}</p>
-                    <p className="text-muted-foreground whitespace-pre-wrap">{emailDraft.conteudo}</p>
+                  <div className="p-3 space-y-2 text-xs">
+                    <div>
+                      <label className="text-[10px] text-muted-foreground font-medium">Assunto</label>
+                      <input
+                        type="text"
+                        value={emailDraft.assunto}
+                        onChange={(e) => setEmailDraft({ ...emailDraft, assunto: e.target.value })}
+                        className="w-full mt-0.5 rounded border border-border bg-secondary/30 px-2 py-1.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground font-medium">Conteúdo</label>
+                      <textarea
+                        value={emailDraft.conteudo}
+                        onChange={(e) => setEmailDraft({ ...emailDraft, conteudo: e.target.value })}
+                        rows={8}
+                        className="w-full mt-0.5 rounded border border-border bg-secondary/30 px-2 py-1.5 text-xs text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-y min-h-[100px]"
+                      />
+                    </div>
                   </div>
                 </div>
               )}
