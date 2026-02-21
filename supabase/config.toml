@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.extract-contract-data]
 verify_jwt = false
+
+[functions.enrich-lead]
+verify_jwt = false
+
+[functions.generate-email]
+verify_jwt = false
