@@ -1,47 +1,51 @@
 
 
-# Integrating Resend for Email Sending
+# Corrigir exibição dos dados de enriquecimento no CRM
 
-## Overview
-Configure the Resend API key as a secure secret and implement an edge function to send personalized emails from the Communications module.
+## Problema identificado
 
-## Steps
+Existem dois problemas:
 
-### 1. Store the Resend API Key
-- Save `RESEND_API_KEY` as a Supabase secret (never in code)
+1. **O drawer nao atualiza apos enriquecimento**: Quando o usuario clica em "Enriquecer com IA", a funcao roda com sucesso no backend e salva os dados no banco, mas o componente `LeadDrawer` nao recarrega os dados do lead. O `handleStatusChange` so atualiza o campo `status`, nao os demais campos enriquecidos (score, segmento, dores, etc.).
 
-### 2. Create Edge Function `send-email`
-- New file: `supabase/functions/send-email/index.ts`
-- Receives: lead email, name, subject, HTML content
-- Uses the Resend API (`https://api.resend.com/emails`) to dispatch the email
-- Returns success/error status
-- Includes proper CORS headers for browser calls
-- JWT verification disabled in `config.toml`, validated in code
+2. **Instagram/LinkedIn so aparecem se preenchidos**: A raspagem de perfis so acontece se os campos `linkedin_url` e `instagram_url` estiverem preenchidos. Caso contrario, a funcao pula essas etapas silenciosamente.
 
-### 3. Update Communications Module
-- Modify `src/pages/Comunicacoes.tsx` to call the edge function when the user clicks "Enviar"
-- Flow remains manual: user composes the email, previews it, and clicks send -- the system dispatches via Resend
-- Show success/error toast based on the response
-- Update the `comunicacoes` table status to reflect actual send result
+## Solucao
 
-### 4. Update `supabase/config.toml`
-- Add `[functions.send-email]` section with `verify_jwt = false`
+### 1. Atualizar o drawer apos enriquecimento
 
----
+No `LeadDrawer.tsx`, apos o enriquecimento bem-sucedido, buscar os dados atualizados do lead no banco e atualizar o estado local:
 
-## Technical Details
+- Na funcao `handleEnrichLead`, apos o sucesso, fazer um `select` do lead atualizado no Supabase
+- Propagar os dados atualizados para o componente pai via um novo callback `onLeadUpdate`
 
-**Edge Function (`send-email/index.ts`)**:
-- Reads `RESEND_API_KEY` from `Deno.env`
-- POST to `https://api.resend.com/emails` with:
-  - `from`: configured sender (e.g., `Vision AI <onboarding@resend.dev>` for testing, or your verified domain)
-  - `to`: lead's email
-  - `subject` and `html` from request body
-- Validates auth via `getClaims()` to ensure only logged-in users can send
+### 2. Propagar atualizacao no CRM.tsx
 
-**Frontend changes**:
-- Replace the direct Supabase insert in `handleEnviarEmail` with a call to `supabase.functions.invoke("send-email", { body: { ... } })`
-- On success, insert the record into `comunicacoes` and update the lead's `email_enviado` flag (as it does today)
+- Adicionar uma prop `onLeadUpdate` no `LeadDrawer` que atualiza o lead tanto na lista `leads` quanto no `drawerLead`
+- Quando o enriquecimento terminar, chamar esse callback com o lead atualizado
 
-**Important**: The Resend free tier uses `onboarding@resend.dev` as the sender. To send from a custom domain, you'll need to verify a domain in the Resend dashboard.
+### 3. Feedback visual das fontes raspadas
+
+- Apos o enriquecimento, exibir um resumo indicando quais fontes foram utilizadas (Site, Busca, LinkedIn, Instagram) com checkmarks
+
+## Detalhes Tecnicos
+
+### Arquivo: `src/components/crm/LeadDrawer.tsx`
+
+- Adicionar prop `onLeadUpdate: (lead: Lead) => void` na interface `LeadDrawerProps`
+- Na funcao `handleEnrichLead`, apos sucesso:
+  - Fazer `supabase.from("leads").select("*").eq("id", lead.id).single()` para obter dados atualizados
+  - Chamar `onLeadUpdate(updatedLead)` com o lead atualizado
+- Atualizar o toast de sucesso para incluir Instagram: `Instagram: ${data.sources?.instagram_scraped ? "ok" : "nao"}`
+
+### Arquivo: `src/pages/CRM.tsx`
+
+- Criar funcao `handleLeadUpdate(updatedLead: Lead)` que:
+  - Atualiza o lead na lista `leads` via `setLeads`
+  - Atualiza o `drawerLead` via `setDrawerLead`
+- Passar `onLeadUpdate={handleLeadUpdate}` para o componente `LeadDrawer`
+
+### Arquivo: `supabase/functions/enrich-lead/index.ts`
+
+- Adicionar `instagram_scraped` no objeto `sources` da resposta (ja existe no codigo mas precisa confirmar que esta retornando corretamente)
 
