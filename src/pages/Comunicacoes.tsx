@@ -110,7 +110,46 @@ export default function Comunicacoes() {
     }
     setSending(true);
 
-    const { error } = await supabase.from("comunicacoes").insert({
+    const lead = leads.find(l => l.id === selectedLeadId);
+    if (!lead) {
+      toast({ title: "Lead não encontrado", variant: "destructive" });
+      setSending(false);
+      return;
+    }
+
+    // Build HTML email
+    const htmlContent = `
+      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+        <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:20px;text-align:center;">
+          <span style="color:#fff;font-weight:bold;font-size:20px;">Vision AI</span>
+        </div>
+        <div style="padding:24px;background:#fff;">
+          <h2 style="margin:0 0 16px;">${assunto}</h2>
+          <div style="white-space:pre-wrap;color:#333;">${conteudo}</div>
+        </div>
+        <div style="background:#f5f5f5;padding:12px;text-align:center;font-size:11px;color:#888;">
+          Vision AI — Inteligência Artificial para o seu negócio
+        </div>
+      </div>`;
+
+    // Call edge function to send via Resend
+    const { data, error: fnError } = await supabase.functions.invoke("send-email", {
+      body: {
+        to: lead.email,
+        name: lead.nome,
+        subject: assunto,
+        html: htmlContent,
+      },
+    });
+
+    if (fnError || (data && data.error)) {
+      toast({ title: "Erro ao enviar email", description: fnError?.message || data?.error, variant: "destructive" });
+      setSending(false);
+      return;
+    }
+
+    // Save record in comunicacoes
+    const { error: dbError } = await supabase.from("comunicacoes").insert({
       lead_id: selectedLeadId,
       tipo: "email",
       direcao: "enviado",
@@ -119,12 +158,11 @@ export default function Comunicacoes() {
       status: "enviado",
     });
 
-    if (error) {
-      toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
+    if (dbError) {
+      toast({ title: "Email enviado, mas erro ao salvar registro", description: dbError.message, variant: "destructive" });
     } else {
-      // Mark lead as email_enviado
       await supabase.from("leads").update({ email_enviado: true, data_email_enviado: new Date().toISOString() }).eq("id", selectedLeadId);
-      toast({ title: "Email registrado com sucesso" });
+      toast({ title: "Email enviado com sucesso!" });
       setNovoEmailOpen(false);
       setSelectedLeadId("");
       setAssunto("");
