@@ -14,6 +14,116 @@ export type Database = {
   }
   public: {
     Tables: {
+      comunicacoes: {
+        Row: {
+          assunto: string | null
+          conteudo: string | null
+          criado_em: string
+          direcao: string
+          id: string
+          lead_id: string
+          status: string
+          tipo: string
+        }
+        Insert: {
+          assunto?: string | null
+          conteudo?: string | null
+          criado_em?: string
+          direcao: string
+          id?: string
+          lead_id: string
+          status?: string
+          tipo: string
+        }
+        Update: {
+          assunto?: string | null
+          conteudo?: string | null
+          criado_em?: string
+          direcao?: string
+          id?: string
+          lead_id?: string
+          status?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comunicacoes_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contratos: {
+        Row: {
+          atualizado_em: string
+          cliente_email: string | null
+          cliente_nome: string
+          cliente_telefone: string | null
+          criado_em: string
+          id: string
+          pdf_url: string | null
+          status: string
+          tipo_servico: string
+          valor_total: number
+        }
+        Insert: {
+          atualizado_em?: string
+          cliente_email?: string | null
+          cliente_nome: string
+          cliente_telefone?: string | null
+          criado_em?: string
+          id?: string
+          pdf_url?: string | null
+          status?: string
+          tipo_servico?: string
+          valor_total?: number
+        }
+        Update: {
+          atualizado_em?: string
+          cliente_email?: string | null
+          cliente_nome?: string
+          cliente_telefone?: string | null
+          criado_em?: string
+          id?: string
+          pdf_url?: string | null
+          status?: string
+          tipo_servico?: string
+          valor_total?: number
+        }
+        Relationships: []
+      }
+      custos: {
+        Row: {
+          ativo: boolean
+          categoria: string
+          criado_em: string
+          data_renovacao: string | null
+          id: string
+          nome: string
+          valor_mensal: number
+        }
+        Insert: {
+          ativo?: boolean
+          categoria?: string
+          criado_em?: string
+          data_renovacao?: string | null
+          id?: string
+          nome: string
+          valor_mensal: number
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string
+          criado_em?: string
+          data_renovacao?: string | null
+          id?: string
+          nome?: string
+          valor_mensal?: number
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           atualizado_em: string | null
@@ -124,6 +234,85 @@ export type Database = {
           whatsapp_respondido?: boolean | null
         }
         Relationships: []
+      }
+      parcelas: {
+        Row: {
+          contrato_id: string
+          criado_em: string
+          data_pagamento: string | null
+          data_vencimento: string
+          descricao: string | null
+          id: string
+          notificacao_enviada: boolean
+          status: string
+          valor: number
+        }
+        Insert: {
+          contrato_id: string
+          criado_em?: string
+          data_pagamento?: string | null
+          data_vencimento: string
+          descricao?: string | null
+          id?: string
+          notificacao_enviada?: boolean
+          status?: string
+          valor: number
+        }
+        Update: {
+          contrato_id?: string
+          criado_em?: string
+          data_pagamento?: string | null
+          data_vencimento?: string
+          descricao?: string | null
+          id?: string
+          notificacao_enviada?: boolean
+          status?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parcelas_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recorrencias: {
+        Row: {
+          ativo: boolean
+          contrato_id: string
+          criado_em: string
+          dia_vencimento: number
+          id: string
+          valor_mensal: number
+        }
+        Insert: {
+          ativo?: boolean
+          contrato_id: string
+          criado_em?: string
+          dia_vencimento?: number
+          id?: string
+          valor_mensal: number
+        }
+        Update: {
+          ativo?: boolean
+          contrato_id?: string
+          criado_em?: string
+          dia_vencimento?: number
+          id?: string
+          valor_mensal?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recorrencias_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
