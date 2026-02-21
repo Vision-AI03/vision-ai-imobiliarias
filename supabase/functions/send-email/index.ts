@@ -52,6 +52,9 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Determine sender — verify domain at resend.com/domains to send to any recipient
+  const FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "Vision AI <onboarding@resend.dev>";
+
   // Send email via Resend
   const resendRes = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -60,7 +63,7 @@ Deno.serve(async (req) => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "Vision AI <onboarding@resend.dev>",
+      from: FROM_EMAIL,
       to: [to],
       subject,
       html,
@@ -70,6 +73,15 @@ Deno.serve(async (req) => {
   const resendData = await resendRes.json();
 
   if (!resendRes.ok) {
+    if (resendRes.status === 403 || (resendData.message || "").includes("verify")) {
+      return new Response(JSON.stringify({ 
+        error: "Domínio não verificado no Resend. Para enviar emails para qualquer destinatário, verifique seu domínio em resend.com/domains e configure o secret RESEND_FROM_EMAIL (ex: 'Vision AI <contato@seudominio.com>').",
+        resend_error: resendData.message,
+      }), {
+        status: 422,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     return new Response(JSON.stringify({ error: resendData.message || "Failed to send email" }), {
       status: resendRes.status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
