@@ -139,6 +139,7 @@ export type Database = {
           email_respondido: boolean | null
           empresa: string | null
           id: string
+          instagram_url: string | null
           linkedin_cargo: string | null
           linkedin_url: string | null
           mensagem_original: string | null
@@ -175,6 +176,7 @@ export type Database = {
           email_respondido?: boolean | null
           empresa?: string | null
           id?: string
+          instagram_url?: string | null
           linkedin_cargo?: string | null
           linkedin_url?: string | null
           mensagem_original?: string | null
@@ -211,6 +213,7 @@ export type Database = {
           email_respondido?: boolean | null
           empresa?: string | null
           id?: string
+          instagram_url?: string | null
           linkedin_cargo?: string | null
           linkedin_url?: string | null
           mensagem_original?: string | null

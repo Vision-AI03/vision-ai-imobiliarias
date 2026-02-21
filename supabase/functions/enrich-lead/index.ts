@@ -186,6 +186,54 @@ Deno.serve(async (req) => {
     }
   }
 
+  // 3b. Scrape Instagram profile with Apify
+  if (APIFY_API_KEY && lead.instagram_url) {
+    try {
+      let instaHandle = lead.instagram_url.trim();
+      // Extract handle from URL or @mention
+      if (instaHandle.includes("instagram.com/")) {
+        instaHandle = instaHandle.split("instagram.com/")[1].split("/")[0].split("?")[0];
+      }
+      if (instaHandle.startsWith("@")) instaHandle = instaHandle.slice(1);
+
+      console.log("Scraping Instagram via Apify:", instaHandle);
+
+      const instaRes = await fetch(
+        `https://api.apify.com/v2/acts/apify~instagram-profile-scraper/run-sync-get-dataset-items?token=${APIFY_API_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            usernames: [instaHandle],
+            resultsLimit: 1,
+          }),
+        }
+      );
+
+      if (instaRes.ok) {
+        const instaData = await instaRes.json();
+        if (Array.isArray(instaData) && instaData.length > 0) {
+          const profile = instaData[0];
+          enrichmentData.instagram_profile = {
+            fullName: profile.fullName || "",
+            biography: profile.biography || "",
+            followersCount: profile.followersCount || 0,
+            followsCount: profile.followsCount || 0,
+            postsCount: profile.postsCount || 0,
+            isBusinessAccount: profile.isBusinessAccount || false,
+            businessCategory: profile.businessCategoryName || "",
+            externalUrl: profile.externalUrl || "",
+          };
+          console.log("Instagram scraped successfully");
+        }
+      } else {
+        console.error("Apify Instagram error:", await instaRes.text());
+      }
+    } catch (e) {
+      console.error("Error scraping Instagram:", e);
+    }
+  }
+
   // 4. Use AI to analyze all collected data and generate enrichment
   const prompt = `Você é um analista de vendas B2B da Vision AI, uma agência de inteligência artificial.
 Analise os dados coletados sobre este lead e gere um perfil enriquecido.
@@ -208,6 +256,9 @@ ${enrichmentData.search_results || "N/A"}
 
 PERFIL LINKEDIN:
 ${enrichmentData.linkedin_profile ? JSON.stringify(enrichmentData.linkedin_profile) : "N/A"}
+
+PERFIL INSTAGRAM:
+${enrichmentData.instagram_profile ? JSON.stringify(enrichmentData.instagram_profile) : "N/A"}
 
 Retorne um JSON com:
 {

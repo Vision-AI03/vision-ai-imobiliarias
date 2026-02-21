@@ -185,6 +185,7 @@ export default function LeadDrawer({ lead, open, onClose, onStatusChange }: Lead
                 <InfoRow icon={<Building2 className="h-3.5 w-3.5" />} label="Empresa" value={lead.empresa} />
                 <InfoRow icon={<Globe className="h-3.5 w-3.5" />} label="Site" value={lead.site_empresa} link />
                 <InfoRow icon={<Linkedin className="h-3.5 w-3.5" />} label="LinkedIn" value={lead.linkedin_url} link />
+                <InfoRow icon={<Globe className="h-3.5 w-3.5" />} label="Instagram" value={(lead as any).instagram_url} link />
                 <InfoRow icon={<User className="h-3.5 w-3.5" />} label="Cargo" value={lead.linkedin_cargo} />
               </div>
             </div>

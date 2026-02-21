@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import KanbanColumn from "@/components/crm/KanbanColumn";
 import LeadCard from "@/components/crm/LeadCard";
 import LeadDrawer from "@/components/crm/LeadDrawer";
+import AddLeadDialog from "@/components/crm/AddLeadDialog";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Lead = Tables<"leads">;
@@ -118,7 +119,10 @@ export default function CRM() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">CRM — Pipeline de Leads</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">CRM — Pipeline de Leads</h1>
+        <AddLeadDialog />
+      </div>
 
       <div className="overflow-x-auto pb-4">
         <DndContext
