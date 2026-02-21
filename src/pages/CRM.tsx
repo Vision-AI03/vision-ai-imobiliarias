@@ -109,6 +109,11 @@ export default function CRM() {
     await supabase.from("leads").update({ status: newStatus }).eq("id", leadId);
   }
 
+  function handleLeadUpdate(updatedLead: Lead) {
+    setLeads(prev => prev.map(l => l.id === updatedLead.id ? updatedLead : l));
+    setDrawerLead(prev => prev && prev.id === updatedLead.id ? updatedLead : prev);
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -159,6 +164,7 @@ export default function CRM() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onStatusChange={handleStatusChange}
+        onLeadUpdate={handleLeadUpdate}
       />
     </div>
   );
