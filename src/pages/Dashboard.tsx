@@ -74,6 +74,7 @@ export default function Dashboard() {
   });
   const [leadsRecentes, setLeadsRecentes] = useState<LeadRecente[]>([]);
   const [pagamentosProximos, setPagamentosProximos] = useState<PagamentoProximo[]>([]);
+  const [tarefasLembrete, setTarefasLembrete] = useState<TarefaLembrete[]>([]);
   const [weeklyLeadsData, setWeeklyLeadsData] = useState<WeeklyLeads[]>([]);
   const [monthlyRevenueData, setMonthlyRevenueData] = useState<MonthlyRevenue[]>([]);
   const [loading, setLoading] = useState(true);
