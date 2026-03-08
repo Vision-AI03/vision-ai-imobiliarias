@@ -485,6 +485,66 @@ export type Database = {
           },
         ]
       }
+      tarefas: {
+        Row: {
+          atualizado_em: string
+          concluida: boolean
+          contrato_id: string | null
+          criado_em: string
+          data_vencimento: string | null
+          descricao: string | null
+          id: string
+          lead_id: string | null
+          prioridade: string
+          status: string
+          titulo: string
+          user_id: string
+        }
+        Insert: {
+          atualizado_em?: string
+          concluida?: boolean
+          contrato_id?: string | null
+          criado_em?: string
+          data_vencimento?: string | null
+          descricao?: string | null
+          id?: string
+          lead_id?: string | null
+          prioridade?: string
+          status?: string
+          titulo: string
+          user_id: string
+        }
+        Update: {
+          atualizado_em?: string
+          concluida?: boolean
+          contrato_id?: string | null
+          criado_em?: string
+          data_vencimento?: string | null
+          descricao?: string | null
+          id?: string
+          lead_id?: string | null
+          prioridade?: string
+          status?: string
+          titulo?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tarefas_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tarefas_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
