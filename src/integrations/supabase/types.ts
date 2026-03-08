@@ -292,6 +292,161 @@ export type Database = {
         }
         Relationships: []
       }
+      email_contatos: {
+        Row: {
+          aberto_em: string | null
+          cargo: string | null
+          created_at: string | null
+          dados_extras: Json | null
+          email: string
+          email_assunto: string | null
+          email_gerado: string | null
+          empresa: string | null
+          enviado_em: string | null
+          id: string
+          lista_id: string | null
+          nome: string | null
+          resend_message_id: string | null
+          respondido_em: string | null
+          status_envio: string | null
+          telefone: string | null
+          user_id: string
+        }
+        Insert: {
+          aberto_em?: string | null
+          cargo?: string | null
+          created_at?: string | null
+          dados_extras?: Json | null
+          email: string
+          email_assunto?: string | null
+          email_gerado?: string | null
+          empresa?: string | null
+          enviado_em?: string | null
+          id?: string
+          lista_id?: string | null
+          nome?: string | null
+          resend_message_id?: string | null
+          respondido_em?: string | null
+          status_envio?: string | null
+          telefone?: string | null
+          user_id: string
+        }
+        Update: {
+          aberto_em?: string | null
+          cargo?: string | null
+          created_at?: string | null
+          dados_extras?: Json | null
+          email?: string
+          email_assunto?: string | null
+          email_gerado?: string | null
+          empresa?: string | null
+          enviado_em?: string | null
+          id?: string
+          lista_id?: string | null
+          nome?: string | null
+          resend_message_id?: string | null
+          respondido_em?: string | null
+          status_envio?: string | null
+          telefone?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_contatos_lista_id_fkey"
+            columns: ["lista_id"]
+            isOneToOne: false
+            referencedRelation: "email_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_lists: {
+        Row: {
+          arquivo_origem: string | null
+          created_at: string | null
+          descricao: string | null
+          emails_abertos: number | null
+          emails_enviados: number | null
+          emails_respondidos: number | null
+          id: string
+          nicho: string
+          nome: string
+          status: string | null
+          total_emails: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          arquivo_origem?: string | null
+          created_at?: string | null
+          descricao?: string | null
+          emails_abertos?: number | null
+          emails_enviados?: number | null
+          emails_respondidos?: number | null
+          id?: string
+          nicho: string
+          nome: string
+          status?: string | null
+          total_emails?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          arquivo_origem?: string | null
+          created_at?: string | null
+          descricao?: string | null
+          emails_abertos?: number | null
+          emails_enviados?: number | null
+          emails_respondidos?: number | null
+          id?: string
+          nicho?: string
+          nome?: string
+          status?: string | null
+          total_emails?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      email_templates_nicho: {
+        Row: {
+          assunto_base: string | null
+          ativo: boolean | null
+          created_at: string | null
+          exemplo_email: string | null
+          id: string
+          nicho: string
+          nome: string
+          prompt_ia: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          assunto_base?: string | null
+          ativo?: boolean | null
+          created_at?: string | null
+          exemplo_email?: string | null
+          id?: string
+          nicho: string
+          nome: string
+          prompt_ia: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          assunto_base?: string | null
+          ativo?: boolean | null
+          created_at?: string | null
+          exemplo_email?: string | null
+          id?: string
+          nicho?: string
+          nome?: string
+          prompt_ia?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           atualizado_em: string | null
