@@ -14,6 +14,7 @@ import Comunicacoes from "./pages/Comunicacoes";
 import Contratos from "./pages/Contratos";
 import Financeiro from "./pages/Financeiro";
 import Credenciais from "./pages/Credenciais";
+import Tarefas from "./pages/Tarefas";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
