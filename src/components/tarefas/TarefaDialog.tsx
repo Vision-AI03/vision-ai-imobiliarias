@@ -137,10 +137,10 @@ export function TarefaDialog({ open, onOpenChange, tarefa, onSaved }: Props) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Vincular a Lead</Label>
-              <Select value={leadId} onValueChange={setLeadId}>
+              <Select value={leadId || "none"} onValueChange={(v) => setLeadId(v === "none" ? "" : v)}>
                 <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhum</SelectItem>
+                  <SelectItem value="none">Nenhum</SelectItem>
                   {leads.map(l => <SelectItem key={l.id} value={l.id}>{l.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
