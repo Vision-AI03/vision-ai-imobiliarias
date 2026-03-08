@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, MessageSquare, FileText, DollarSign, LogOut, Zap, Settings, KeyRound } from "lucide-react";
+import { LayoutDashboard, Users, MessageSquare, FileText, DollarSign, LogOut, Zap, Settings, KeyRound, CheckSquare } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -19,6 +19,7 @@ const items = [
   { title: "Comunicações", url: "/comunicacoes", icon: MessageSquare },
   { title: "Contratos", url: "/contratos", icon: FileText },
   { title: "Financeiro", url: "/financeiro", icon: DollarSign },
+  { title: "Tarefas", url: "/tarefas", icon: CheckSquare },
   { title: "Credenciais", url: "/configuracoes/credenciais", icon: KeyRound },
 ];
 

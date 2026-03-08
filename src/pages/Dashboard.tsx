@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, Calendar, Mail, MessageSquare, DollarSign, TrendingUp } from "lucide-react";
+import { Users, Calendar, Mail, MessageSquare, DollarSign, TrendingUp, CheckSquare, AlertTriangle, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -47,6 +47,15 @@ interface MonthlyRevenue {
   recorrente: number;
 }
 
+interface TarefaLembrete {
+  id: string;
+  titulo: string;
+  prioridade: string;
+  data_vencimento: string | null;
+  status: string;
+  tipo: "atrasada" | "hoje" | "proxima";
+}
+
 function getScoreColor(score: number | null) {
   if (!score) return "bg-muted text-muted-foreground";
   if (score >= 71) return "bg-success/20 text-success";
@@ -65,6 +74,7 @@ export default function Dashboard() {
   });
   const [leadsRecentes, setLeadsRecentes] = useState<LeadRecente[]>([]);
   const [pagamentosProximos, setPagamentosProximos] = useState<PagamentoProximo[]>([]);
+  const [tarefasLembrete, setTarefasLembrete] = useState<TarefaLembrete[]>([]);
   const [weeklyLeadsData, setWeeklyLeadsData] = useState<WeeklyLeads[]>([]);
   const [monthlyRevenueData, setMonthlyRevenueData] = useState<MonthlyRevenue[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,7 +91,7 @@ export default function Dashboard() {
 
     // Parallel fetch
     const [
-      leadsRes, leadsRecentesRes, parcelasRes, recorrenciasRes, custosRes, allLeadsRes,
+      leadsRes, leadsRecentesRes, parcelasRes, recorrenciasRes, custosRes, allLeadsRes, tarefasRes,
     ] = await Promise.all([
       supabase.from("leads").select("*").gte("criado_em", mesAtualInicio).lte("criado_em", mesAtualFim),
       supabase.from("leads").select("id, nome, empresa, score, status, criado_em").order("criado_em", { ascending: false }).limit(5),
@@ -89,6 +99,7 @@ export default function Dashboard() {
       supabase.from("recorrencias").select("valor_mensal").eq("ativo", true),
       supabase.from("custos").select("valor_mensal").eq("ativo", true),
       supabase.from("leads").select("criado_em").gte("criado_em", subDays(now, 30).toISOString()),
+      supabase.from("tarefas").select("id, titulo, prioridade, data_vencimento, status").eq("concluida", false).order("data_vencimento", { ascending: true }).limit(20),
     ]);
 
     // KPIs
@@ -140,6 +151,18 @@ export default function Dashboard() {
       status: p.status,
     }));
     setPagamentosProximos(pagamentos);
+
+    // Tarefas lembretes
+    const tarefasData = (tarefasRes.data || []).map((t: any) => {
+      const today = format(now, "yyyy-MM-dd");
+      let tipo: "atrasada" | "hoje" | "proxima" = "proxima";
+      if (t.data_vencimento) {
+        if (t.data_vencimento < today) tipo = "atrasada";
+        else if (t.data_vencimento === today) tipo = "hoje";
+      }
+      return { ...t, tipo };
+    });
+    setTarefasLembrete(tarefasData.filter((t: TarefaLembrete) => t.tipo === "atrasada" || t.tipo === "hoje" || t.data_vencimento).slice(0, 8));
 
     // Weekly leads chart (last 4 weeks)
     const allLeads = allLeadsRes.data || [];
@@ -266,6 +289,43 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Lembretes de Tarefas */}
+      {tarefasLembrete.length > 0 && (
+        <Card className="glass-card border-warning/30">
+          <CardHeader className="flex flex-row items-center gap-2">
+            <CheckSquare className="h-4 w-4 text-warning" />
+            <CardTitle className="text-sm">Lembretes de Tarefas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {tarefasLembrete.map((t) => (
+                <div key={t.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                  <div className="flex items-center gap-2">
+                    {t.tipo === "atrasada" ? (
+                      <AlertTriangle className="h-4 w-4 text-destructive" />
+                    ) : t.tipo === "hoje" ? (
+                      <Clock className="h-4 w-4 text-warning" />
+                    ) : (
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <div>
+                      <p className="text-sm font-medium">{t.titulo}</p>
+                      {t.data_vencimento && (
+                        <p className={`text-xs ${t.tipo === "atrasada" ? "text-destructive" : "text-muted-foreground"}`}>
+                          {t.tipo === "atrasada" ? "Atrasada — " : t.tipo === "hoje" ? "Vence hoje — " : ""}
+                          {format(new Date(t.data_vencimento + "T00:00:00"), "dd/MM/yyyy")}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="text-xs capitalize">{t.prioridade}</Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Bottom Lists */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
