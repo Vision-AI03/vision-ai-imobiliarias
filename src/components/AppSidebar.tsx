@@ -19,6 +19,7 @@ const items = [
   { title: "Comunicações", url: "/comunicacoes", icon: MessageSquare },
   { title: "Contratos", url: "/contratos", icon: FileText },
   { title: "Financeiro", url: "/financeiro", icon: DollarSign },
+  { title: "Tarefas", url: "/tarefas", icon: CheckSquare },
   { title: "Credenciais", url: "/configuracoes/credenciais", icon: KeyRound },
 ];
 
