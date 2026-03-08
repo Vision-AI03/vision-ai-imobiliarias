@@ -147,10 +147,10 @@ export function TarefaDialog({ open, onOpenChange, tarefa, onSaved }: Props) {
             </div>
             <div>
               <Label>Vincular a Contrato</Label>
-              <Select value={contratoId} onValueChange={setContratoId}>
+              <Select value={contratoId || "none"} onValueChange={(v) => setContratoId(v === "none" ? "" : v)}>
                 <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhum</SelectItem>
+                  <SelectItem value="none">Nenhum</SelectItem>
                   {contratos.map(c => <SelectItem key={c.id} value={c.id}>{c.cliente_nome}</SelectItem>)}
                 </SelectContent>
               </Select>
