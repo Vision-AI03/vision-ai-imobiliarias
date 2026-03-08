@@ -3,20 +3,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Mail, MessageSquare, Send, Plus, Search, MailCheck, CheckCheck, Calendar, TrendingUp } from "lucide-react";
+import { Mail, MessageSquare, Send, Plus, Search, MailCheck, CheckCheck, Calendar, TrendingUp, Clock, ArrowUpRight, ArrowDownLeft, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { format, isToday, isYesterday, formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
+import { EmailComposeDialog } from "@/components/comunicacoes/EmailComposeDialog";
+import { ComunicacaoDrawer } from "@/components/comunicacoes/ComunicacaoDrawer";
 
 type Comunicacao = Tables<"comunicacoes">;
 type Lead = Tables<"leads">;
+type EnrichedCom = Comunicacao & { lead?: Lead };
 
 interface EmailMetrics {
   enviados: number;
@@ -40,21 +40,39 @@ function getStatusBadge(status: string) {
   }
 }
 
+function formatRelativeDate(dateStr: string) {
+  const date = new Date(dateStr);
+  if (isToday(date)) return `Hoje, ${format(date, "HH:mm")}`;
+  if (isYesterday(date)) return `Ontem, ${format(date, "HH:mm")}`;
+  return format(date, "dd/MM/yyyy HH:mm");
+}
+
+function groupByDate(items: EnrichedCom[]): Record<string, EnrichedCom[]> {
+  const groups: Record<string, EnrichedCom[]> = {};
+  items.forEach(item => {
+    const date = new Date(item.criado_em);
+    let key: string;
+    if (isToday(date)) key = "Hoje";
+    else if (isYesterday(date)) key = "Ontem";
+    else key = format(date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(item);
+  });
+  return groups;
+}
+
 export default function Comunicacoes() {
-  const [comunicacoes, setComunicacoes] = useState<(Comunicacao & { lead?: Lead })[]>([]);
+  const [comunicacoes, setComunicacoes] = useState<EnrichedCom[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [emailMetrics, setEmailMetrics] = useState<EmailMetrics>({ enviados: 0, abertos: 0, respondidos: 0, taxaConversao: 0 });
   const [whatsMetrics, setWhatsMetrics] = useState<WhatsAppMetrics>({ enviadas: 0, respondidas: 0, reunioes: 0, taxaResposta: 0 });
-  const [novoEmailOpen, setNovoEmailOpen] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCom, setSelectedCom] = useState<EnrichedCom | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "timeline">("list");
   const { toast } = useToast();
-
-  // New email form state
-  const [selectedLeadId, setSelectedLeadId] = useState("");
-  const [assunto, setAssunto] = useState("");
-  const [conteudo, setConteudo] = useState("");
-  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -71,7 +89,6 @@ export default function Comunicacoes() {
     const allLeads = leadsRes.data || [];
     setLeads(allLeads);
 
-    // Enrich comunicacoes with lead data
     const enriched = coms.map(c => ({
       ...c,
       lead: allLeads.find(l => l.id === c.lead_id),
@@ -103,88 +120,23 @@ export default function Comunicacoes() {
     setLoading(false);
   }
 
-  async function handleEnviarEmail() {
-    if (!selectedLeadId || !assunto || !conteudo) {
-      toast({ title: "Preencha todos os campos", variant: "destructive" });
-      return;
-    }
-    setSending(true);
-
-    const lead = leads.find(l => l.id === selectedLeadId);
-    if (!lead) {
-      toast({ title: "Lead não encontrado", variant: "destructive" });
-      setSending(false);
-      return;
-    }
-
-    // Build HTML email
-    const htmlContent = `
-      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
-        <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:20px;text-align:center;">
-          <span style="color:#fff;font-weight:bold;font-size:20px;">Vision AI</span>
-        </div>
-        <div style="padding:24px;background:#fff;">
-          <h2 style="margin:0 0 16px;">${assunto}</h2>
-          <div style="white-space:pre-wrap;color:#333;">${conteudo}</div>
-        </div>
-        <div style="background:#f5f5f5;padding:12px;text-align:center;font-size:11px;color:#888;">
-          Vision AI — Inteligência Artificial para o seu negócio
-        </div>
-      </div>`;
-
-    // Call edge function to send via Resend
-    const { data, error: fnError } = await supabase.functions.invoke("send-email", {
-      body: {
-        to: lead.email,
-        name: lead.nome,
-        subject: assunto,
-        html: htmlContent,
-      },
-    });
-
-    if (fnError || (data && data.error)) {
-      toast({ title: "Erro ao enviar email", description: fnError?.message || data?.error, variant: "destructive" });
-      setSending(false);
-      return;
-    }
-
-    // Save record in comunicacoes
-    const { error: dbError } = await supabase.from("comunicacoes").insert({
-      lead_id: selectedLeadId,
-      tipo: "email",
-      direcao: "enviado",
-      assunto,
-      conteudo,
-      status: "enviado",
-    });
-
-    if (dbError) {
-      toast({ title: "Email enviado, mas erro ao salvar registro", description: dbError.message, variant: "destructive" });
-    } else {
-      await supabase.from("leads").update({ email_enviado: true, data_email_enviado: new Date().toISOString() }).eq("id", selectedLeadId);
-      toast({ title: "Email enviado com sucesso!" });
-      setNovoEmailOpen(false);
-      setSelectedLeadId("");
-      setAssunto("");
-      setConteudo("");
-      fetchData();
-    }
-    setSending(false);
+  function handleOpenDetail(com: EnrichedCom) {
+    setSelectedCom(com);
+    setDrawerOpen(true);
   }
 
-  const emailComs = comunicacoes.filter(c => c.tipo === "email");
-  const whatsComs = comunicacoes.filter(c => c.tipo === "whatsapp");
+  const filterItems = (items: EnrichedCom[]) =>
+    items.filter(c =>
+      !searchTerm ||
+      c.lead?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.lead?.empresa?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.assunto?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.conteudo?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
-  const filteredEmails = emailComs.filter(c =>
-    !searchTerm || c.lead?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.lead?.empresa?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.assunto?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const filteredWhats = whatsComs.filter(c =>
-    !searchTerm || c.lead?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.lead?.empresa?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const emailComs = filterItems(comunicacoes.filter(c => c.tipo === "email"));
+  const whatsComs = filterItems(comunicacoes.filter(c => c.tipo === "whatsapp"));
+  const allFiltered = filterItems(comunicacoes);
 
   if (loading) {
     return (
@@ -208,18 +160,23 @@ export default function Comunicacoes() {
               className="pl-9 w-60 bg-secondary/30"
             />
           </div>
+          <Button onClick={() => setComposeOpen(true)} className="gap-1.5">
+            <Plus className="h-4 w-4" /> Novo Email
+          </Button>
         </div>
       </div>
 
       <Tabs defaultValue="email" className="space-y-4">
-        <TabsList className="bg-secondary/50">
-          <TabsTrigger value="email" className="gap-1.5"><Mail className="h-4 w-4" />Email</TabsTrigger>
-          <TabsTrigger value="whatsapp" className="gap-1.5"><MessageSquare className="h-4 w-4" />WhatsApp</TabsTrigger>
-        </TabsList>
+        <div className="flex items-center justify-between">
+          <TabsList className="bg-secondary/50">
+            <TabsTrigger value="email" className="gap-1.5"><Mail className="h-4 w-4" />Email</TabsTrigger>
+            <TabsTrigger value="whatsapp" className="gap-1.5"><MessageSquare className="h-4 w-4" />WhatsApp</TabsTrigger>
+            <TabsTrigger value="timeline" className="gap-1.5"><History className="h-4 w-4" />Timeline</TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* EMAIL TAB */}
         <TabsContent value="email" className="space-y-4">
-          {/* Metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <MetricCard icon={<Send className="h-4 w-4" />} title="Enviados" value={String(emailMetrics.enviados)} />
             <MetricCard icon={<MailCheck className="h-4 w-4" />} title="Abertos" value={String(emailMetrics.abertos)} />
@@ -227,102 +184,7 @@ export default function Comunicacoes() {
             <MetricCard icon={<TrendingUp className="h-4 w-4" />} title="Taxa Conversão" value={`${emailMetrics.taxaConversao}%`} />
           </div>
 
-          <div className="flex justify-end">
-            <Dialog open={novoEmailOpen} onOpenChange={setNovoEmailOpen}>
-              <DialogTrigger asChild>
-                <Button className="gradient-primary text-primary-foreground gap-1.5">
-                  <Plus className="h-4 w-4" /> Novo Email
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-2xl bg-card border-border">
-                <DialogHeader>
-                  <DialogTitle>Compor Email</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Para (Lead)</Label>
-                    <Select value={selectedLeadId} onValueChange={setSelectedLeadId}>
-                      <SelectTrigger><SelectValue placeholder="Selecione um lead..." /></SelectTrigger>
-                      <SelectContent>
-                        {leads.map(l => (
-                          <SelectItem key={l.id} value={l.id}>
-                            {l.nome} {l.empresa ? `— ${l.empresa}` : ""} ({l.email})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Assunto</Label>
-                    <Input value={assunto} onChange={e => setAssunto(e.target.value)} placeholder="Assunto do email" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Conteúdo</Label>
-                    <Textarea value={conteudo} onChange={e => setConteudo(e.target.value)} placeholder="Escreva o conteúdo do email..." className="min-h-[200px]" />
-                  </div>
-
-                  {/* Preview */}
-                  {(assunto || conteudo) && (
-                    <>
-                      <Separator />
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">Preview</Label>
-                        <div className="rounded-lg border border-border overflow-hidden">
-                          <div className="gradient-primary p-4 flex items-center gap-2">
-                            <span className="text-white font-bold text-lg">Vision AI</span>
-                          </div>
-                          <div className="bg-card p-4 space-y-2">
-                            <h3 className="font-semibold">{assunto || "Sem assunto"}</h3>
-                            <div className="text-sm text-muted-foreground whitespace-pre-wrap">{conteudo || "..."}</div>
-                          </div>
-                          <div className="bg-secondary/30 px-4 py-3 text-[10px] text-muted-foreground text-center">
-                            Vision AI — Inteligência Artificial para o seu negócio
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => setNovoEmailOpen(false)}>Cancelar</Button>
-                    <Button onClick={handleEnviarEmail} disabled={sending} className="gradient-primary text-primary-foreground gap-1.5">
-                      <Send className="h-4 w-4" />
-                      {sending ? "Enviando..." : "Enviar"}
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          {/* Email List */}
-          <Card className="glass-card">
-            <CardContent className="p-0">
-              {filteredEmails.length === 0 ? (
-                <p className="text-sm text-muted-foreground p-6">Nenhum email registrado.</p>
-              ) : (
-                <div className="divide-y divide-border">
-                  {filteredEmails.map(c => (
-                    <div key={c.id} className="flex items-center justify-between px-4 py-3 hover:bg-secondary/20 transition-colors">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium truncate">{c.lead?.nome || "—"}</p>
-                          {c.lead?.empresa && <span className="text-xs text-muted-foreground">— {c.lead.empresa}</span>}
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate">{c.assunto || "Sem assunto"}</p>
-                      </div>
-                      <div className="flex items-center gap-3 ml-4">
-                        <Badge className={`text-[10px] ${getStatusBadge(c.status)}`}>{c.status}</Badge>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {format(new Date(c.criado_em), "dd/MM/yyyy HH:mm")}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <CommunicationList items={emailComs} onSelect={handleOpenDetail} type="email" />
         </TabsContent>
 
         {/* WHATSAPP TAB */}
@@ -330,46 +192,40 @@ export default function Comunicacoes() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <MetricCard icon={<Send className="h-4 w-4" />} title="Enviadas" value={String(whatsMetrics.enviadas)} />
             <MetricCard icon={<CheckCheck className="h-4 w-4" />} title="Respondidas" value={String(whatsMetrics.respondidas)} />
-            <MetricCard icon={<Calendar className="h-4 w-4" />} title="Reuniões via WhatsApp" value={String(whatsMetrics.reunioes)} />
+            <MetricCard icon={<Calendar className="h-4 w-4" />} title="Reuniões" value={String(whatsMetrics.reunioes)} />
             <MetricCard icon={<TrendingUp className="h-4 w-4" />} title="Taxa Resposta" value={`${whatsMetrics.taxaResposta}%`} />
           </div>
 
-          <Card className="glass-card">
-            <CardContent className="p-0">
-              {filteredWhats.length === 0 ? (
-                <p className="text-sm text-muted-foreground p-6">Nenhuma mensagem WhatsApp registrada.</p>
-              ) : (
-                <div className="divide-y divide-border">
-                  {filteredWhats.map(c => (
-                    <div key={c.id} className="flex items-center justify-between px-4 py-3 hover:bg-secondary/20 transition-colors">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium truncate">{c.lead?.nome || "—"}</p>
-                          {c.lead?.empresa && <span className="text-xs text-muted-foreground">— {c.lead.empresa}</span>}
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate line-clamp-1">{c.conteudo || "—"}</p>
-                      </div>
-                      <div className="flex items-center gap-3 ml-4">
-                        <Badge className={`text-[10px] ${getStatusBadge(c.status)}`}>{c.direcao}</Badge>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {format(new Date(c.criado_em), "dd/MM/yyyy HH:mm")}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <CommunicationList items={whatsComs} onSelect={handleOpenDetail} type="whatsapp" />
+        </TabsContent>
+
+        {/* TIMELINE TAB */}
+        <TabsContent value="timeline" className="space-y-4">
+          <TimelineView items={allFiltered} onSelect={handleOpenDetail} />
         </TabsContent>
       </Tabs>
+
+      <EmailComposeDialog
+        open={composeOpen}
+        onOpenChange={setComposeOpen}
+        leads={leads}
+        onSent={fetchData}
+      />
+
+      <ComunicacaoDrawer
+        comunicacao={selectedCom}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+      />
     </div>
   );
 }
 
+// --- Sub-components ---
+
 function MetricCard({ icon, title, value }: { icon: React.ReactNode; title: string; value: string }) {
   return (
-    <Card className="glass-card">
+    <Card className="bg-card border-border">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-xs font-medium text-muted-foreground">{title}</CardTitle>
         <span className="text-primary">{icon}</span>
@@ -378,5 +234,116 @@ function MetricCard({ icon, title, value }: { icon: React.ReactNode; title: stri
         <div className="text-xl font-bold">{value}</div>
       </CardContent>
     </Card>
+  );
+}
+
+function CommunicationList({ items, onSelect, type }: { items: EnrichedCom[]; onSelect: (c: EnrichedCom) => void; type: string }) {
+  if (items.length === 0) {
+    return (
+      <Card className="bg-card border-border">
+        <CardContent className="p-6">
+          <p className="text-sm text-muted-foreground">
+            {type === "email" ? "Nenhum email registrado." : "Nenhuma mensagem WhatsApp registrada."}
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="bg-card border-border">
+      <CardContent className="p-0">
+        <div className="divide-y divide-border">
+          {items.map(c => (
+            <button
+              key={c.id}
+              onClick={() => onSelect(c)}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-secondary/20 transition-colors text-left"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    {c.direcao === "enviado" ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownLeft className="h-3 w-3" />}
+                  </div>
+                  <p className="text-sm font-medium truncate">{c.lead?.nome || "—"}</p>
+                  {c.lead?.empresa && <span className="text-xs text-muted-foreground">— {c.lead.empresa}</span>}
+                </div>
+                <p className="text-xs text-muted-foreground truncate ml-5">
+                  {type === "email" ? (c.assunto || "Sem assunto") : (c.conteudo || "—")}
+                </p>
+              </div>
+              <div className="flex items-center gap-3 ml-4">
+                <Badge className={`text-[10px] ${getStatusBadge(c.status)}`}>
+                  {c.status}
+                </Badge>
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  {formatRelativeDate(c.criado_em)}
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TimelineView({ items, onSelect }: { items: EnrichedCom[]; onSelect: (c: EnrichedCom) => void }) {
+  const grouped = groupByDate(items);
+  const dateKeys = Object.keys(grouped);
+
+  if (items.length === 0) {
+    return (
+      <Card className="bg-card border-border">
+        <CardContent className="p-6">
+          <p className="text-sm text-muted-foreground">Nenhuma comunicação registrada.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {dateKeys.map(dateKey => (
+        <div key={dateKey}>
+          <div className="flex items-center gap-2 mb-3">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            <h3 className="text-sm font-semibold text-muted-foreground">{dateKey}</h3>
+          </div>
+          <div className="relative ml-2 border-l-2 border-border pl-6 space-y-3">
+            {grouped[dateKey].map(c => (
+              <button
+                key={c.id}
+                onClick={() => onSelect(c)}
+                className="relative w-full text-left rounded-lg border border-border bg-card p-3 hover:bg-secondary/20 transition-colors"
+              >
+                {/* Timeline dot */}
+                <div className="absolute -left-[31px] top-4 h-3 w-3 rounded-full border-2 border-border bg-primary" />
+
+                <div className="flex items-center gap-2 mb-1">
+                  {c.tipo === "email" ? (
+                    <Mail className="h-3.5 w-3.5 text-primary" />
+                  ) : (
+                    <MessageSquare className="h-3.5 w-3.5 text-emerald-500" />
+                  )}
+                  <span className="text-xs font-medium">
+                    {c.tipo === "email" ? "Email" : "WhatsApp"}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {c.direcao === "enviado" ? "→" : "←"} {c.lead?.nome || "—"}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground ml-auto">
+                    {format(new Date(c.criado_em), "HH:mm")}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground truncate">
+                  {c.assunto || c.conteudo || "Sem conteúdo"}
+                </p>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
