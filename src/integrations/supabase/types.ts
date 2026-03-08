@@ -55,6 +55,42 @@ export type Database = {
           },
         ]
       }
+      contrato_templates: {
+        Row: {
+          ativo: boolean | null
+          conteudo_template: string
+          created_at: string | null
+          id: string
+          nome: string
+          placeholders: Json | null
+          tipo: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          conteudo_template: string
+          created_at?: string | null
+          id?: string
+          nome: string
+          placeholders?: Json | null
+          tipo: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          ativo?: boolean | null
+          conteudo_template?: string
+          created_at?: string | null
+          id?: string
+          nome?: string
+          placeholders?: Json | null
+          tipo?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       contratos: {
         Row: {
           atualizado_em: string
@@ -93,6 +129,87 @@ export type Database = {
           valor_total?: number
         }
         Relationships: []
+      }
+      contratos_gerados: {
+        Row: {
+          chat_historico: Json | null
+          cnpj_cpf: string | null
+          conteudo_final: string
+          created_at: string | null
+          dados_preenchidos: Json
+          email_cliente: string | null
+          endereco: string | null
+          id: string
+          lead_id: string | null
+          nome_cliente: string
+          numero_parcelas: number | null
+          status: string | null
+          telefone_cliente: string | null
+          template_id: string | null
+          tipo_pagamento: string | null
+          updated_at: string | null
+          user_id: string
+          valor_recorrente: number | null
+          valor_total: number | null
+        }
+        Insert: {
+          chat_historico?: Json | null
+          cnpj_cpf?: string | null
+          conteudo_final: string
+          created_at?: string | null
+          dados_preenchidos?: Json
+          email_cliente?: string | null
+          endereco?: string | null
+          id?: string
+          lead_id?: string | null
+          nome_cliente: string
+          numero_parcelas?: number | null
+          status?: string | null
+          telefone_cliente?: string | null
+          template_id?: string | null
+          tipo_pagamento?: string | null
+          updated_at?: string | null
+          user_id: string
+          valor_recorrente?: number | null
+          valor_total?: number | null
+        }
+        Update: {
+          chat_historico?: Json | null
+          cnpj_cpf?: string | null
+          conteudo_final?: string
+          created_at?: string | null
+          dados_preenchidos?: Json
+          email_cliente?: string | null
+          endereco?: string | null
+          id?: string
+          lead_id?: string | null
+          nome_cliente?: string
+          numero_parcelas?: number | null
+          status?: string | null
+          telefone_cliente?: string | null
+          template_id?: string | null
+          tipo_pagamento?: string | null
+          updated_at?: string | null
+          user_id?: string
+          valor_recorrente?: number | null
+          valor_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratos_gerados_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_gerados_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "contrato_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       credentials: {
         Row: {
