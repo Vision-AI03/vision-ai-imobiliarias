@@ -91,7 +91,7 @@ export default function Dashboard() {
 
     // Parallel fetch
     const [
-      leadsRes, leadsRecentesRes, parcelasRes, recorrenciasRes, custosRes, allLeadsRes,
+      leadsRes, leadsRecentesRes, parcelasRes, recorrenciasRes, custosRes, allLeadsRes, tarefasRes,
     ] = await Promise.all([
       supabase.from("leads").select("*").gte("criado_em", mesAtualInicio).lte("criado_em", mesAtualFim),
       supabase.from("leads").select("id, nome, empresa, score, status, criado_em").order("criado_em", { ascending: false }).limit(5),
@@ -99,6 +99,7 @@ export default function Dashboard() {
       supabase.from("recorrencias").select("valor_mensal").eq("ativo", true),
       supabase.from("custos").select("valor_mensal").eq("ativo", true),
       supabase.from("leads").select("criado_em").gte("criado_em", subDays(now, 30).toISOString()),
+      supabase.from("tarefas").select("id, titulo, prioridade, data_vencimento, status").eq("concluida", false).order("data_vencimento", { ascending: true }).limit(20),
     ]);
 
     // KPIs
