@@ -47,6 +47,15 @@ interface MonthlyRevenue {
   recorrente: number;
 }
 
+interface TarefaLembrete {
+  id: string;
+  titulo: string;
+  prioridade: string;
+  data_vencimento: string | null;
+  status: string;
+  tipo: "atrasada" | "hoje" | "proxima";
+}
+
 function getScoreColor(score: number | null) {
   if (!score) return "bg-muted text-muted-foreground";
   if (score >= 71) return "bg-success/20 text-success";
