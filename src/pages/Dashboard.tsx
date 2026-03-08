@@ -290,6 +290,43 @@ export default function Dashboard() {
         </Card>
       </div>
 
+      {/* Lembretes de Tarefas */}
+      {tarefasLembrete.length > 0 && (
+        <Card className="glass-card border-warning/30">
+          <CardHeader className="flex flex-row items-center gap-2">
+            <CheckSquare className="h-4 w-4 text-warning" />
+            <CardTitle className="text-sm">Lembretes de Tarefas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {tarefasLembrete.map((t) => (
+                <div key={t.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                  <div className="flex items-center gap-2">
+                    {t.tipo === "atrasada" ? (
+                      <AlertTriangle className="h-4 w-4 text-destructive" />
+                    ) : t.tipo === "hoje" ? (
+                      <Clock className="h-4 w-4 text-warning" />
+                    ) : (
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <div>
+                      <p className="text-sm font-medium">{t.titulo}</p>
+                      {t.data_vencimento && (
+                        <p className={`text-xs ${t.tipo === "atrasada" ? "text-destructive" : "text-muted-foreground"}`}>
+                          {t.tipo === "atrasada" ? "Atrasada — " : t.tipo === "hoje" ? "Vence hoje — " : ""}
+                          {format(new Date(t.data_vencimento + "T00:00:00"), "dd/MM/yyyy")}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="text-xs capitalize">{t.prioridade}</Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Bottom Lists */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Leads */}
