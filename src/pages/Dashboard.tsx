@@ -152,6 +152,18 @@ export default function Dashboard() {
     }));
     setPagamentosProximos(pagamentos);
 
+    // Tarefas lembretes
+    const tarefasData = (tarefasRes.data || []).map((t: any) => {
+      const today = format(now, "yyyy-MM-dd");
+      let tipo: "atrasada" | "hoje" | "proxima" = "proxima";
+      if (t.data_vencimento) {
+        if (t.data_vencimento < today) tipo = "atrasada";
+        else if (t.data_vencimento === today) tipo = "hoje";
+      }
+      return { ...t, tipo };
+    });
+    setTarefasLembrete(tarefasData.filter((t: TarefaLembrete) => t.tipo === "atrasada" || t.tipo === "hoje" || t.data_vencimento).slice(0, 8));
+
     // Weekly leads chart (last 4 weeks)
     const allLeads = allLeadsRes.data || [];
     const weeks: WeeklyLeads[] = [];
