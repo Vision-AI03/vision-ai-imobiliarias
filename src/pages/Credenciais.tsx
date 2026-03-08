@@ -1,11 +1,12 @@
 import { useEffect, useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose,
 } from "@/components/ui/dialog";
@@ -21,7 +22,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Eye, EyeOff, Copy, Search, KeyRound, AlertTriangle, Pencil, Trash2, CalendarIcon } from "lucide-react";
+import { Plus, Eye, EyeOff, Copy, Search, KeyRound, AlertTriangle, Pencil, Trash2, CalendarIcon, Building2, Users } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -51,6 +52,7 @@ interface Credential {
   expira_em: string | null;
   ativo: boolean;
   created_at: string;
+  escopo: string;
 }
 
 const maskedValue = (val: string) => {
@@ -67,6 +69,7 @@ export default function Credenciais() {
   const [editId, setEditId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState("vision_ai");
 
   // Form state
   const [nome, setNome] = useState("");
@@ -129,6 +132,7 @@ export default function Credenciais() {
       url_servico: urlServico.trim() || null,
       expira_em: expiraEm ? expiraEm.toISOString() : null,
       notas: notas.trim() || null,
+      escopo: activeTab,
       updated_at: new Date().toISOString(),
     };
 
@@ -180,12 +184,16 @@ export default function Credenciais() {
   }
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return credentials;
+    const byScope = credentials.filter(c => c.escopo === activeTab);
+    if (!search.trim()) return byScope;
     const q = search.toLowerCase();
-    return credentials.filter(c =>
+    return byScope.filter(c =>
       c.nome.toLowerCase().includes(q) || c.servico.toLowerCase().includes(q)
     );
-  }, [credentials, search]);
+  }, [credentials, search, activeTab]);
+
+  const visionCount = credentials.filter(c => c.escopo === "vision_ai").length;
+  const clienteCount = credentials.filter(c => c.escopo === "cliente").length;
 
   if (loading) {
     return (
@@ -197,188 +205,141 @@ export default function Credenciais() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Cofre de Credenciais</h1>
-          <p className="text-sm text-muted-foreground">Gerencie suas chaves de API, tokens e senhas de forma segura.</p>
+      <div>
+        <h1 className="text-2xl font-bold">Cofre de Credenciais</h1>
+        <p className="text-sm text-muted-foreground">Gerencie suas chaves de API, tokens e senhas de forma segura.</p>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <TabsList>
+            <TabsTrigger value="vision_ai" className="gap-2">
+              <Building2 className="h-4 w-4" />
+              Vision AI
+              {visionCount > 0 && <Badge variant="secondary" className="ml-1 text-xs">{visionCount}</Badge>}
+            </TabsTrigger>
+            <TabsTrigger value="cliente" className="gap-2">
+              <Users className="h-4 w-4" />
+              Clientes
+              {clienteCount > 0 && <Badge variant="secondary" className="ml-1 text-xs">{clienteCount}</Badge>}
+            </TabsTrigger>
+          </TabsList>
+
+          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+            <DialogTrigger asChild>
+              <Button><Plus className="h-4 w-4 mr-2" />Nova Credencial</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>{editId ? "Editar Credencial" : "Nova Credencial"}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label>Nome *</Label>
+                  <Input placeholder="Ex: Gemini API Key" value={nome} onChange={e => setNome(e.target.value)} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Serviço *</Label>
+                    <Select value={servico} onValueChange={setServico}>
+                      <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                      <SelectContent>
+                        {SERVICOS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Tipo *</Label>
+                    <Select value={tipo} onValueChange={setTipo}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {TIPOS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div>
+                  <Label>Valor *</Label>
+                  <div className="relative">
+                    <Input
+                      type={showValor ? "text" : "password"}
+                      placeholder="Cole a chave ou token aqui"
+                      value={valor}
+                      onChange={e => setValor(e.target.value)}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowValor(!showValor)}
+                    >
+                      {showValor ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <Label>URL do Serviço</Label>
+                  <Input placeholder="https://aistudio.google.com" value={urlServico} onChange={e => setUrlServico(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Data de Expiração</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !expiraEm && "text-muted-foreground")}>
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {expiraEm ? format(expiraEm, "dd/MM/yyyy", { locale: ptBR }) : "Sem expiração"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar mode="single" selected={expiraEm} onSelect={setExpiraEm} className="p-3 pointer-events-auto" />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div>
+                  <Label>Notas</Label>
+                  <Textarea placeholder="Observações opcionais" value={notas} onChange={e => setNotas(e.target.value)} rows={2} />
+                </div>
+              </div>
+              <DialogFooter>
+                <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
+                <Button onClick={handleSave}>{editId ? "Salvar" : "Criar"}</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-          <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />Nova Credencial</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>{editId ? "Editar Credencial" : "Nova Credencial"}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label>Nome *</Label>
-                <Input placeholder="Ex: Gemini API Key" value={nome} onChange={e => setNome(e.target.value)} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Serviço *</Label>
-                  <Select value={servico} onValueChange={setServico}>
-                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                    <SelectContent>
-                      {SERVICOS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Tipo *</Label>
-                  <Select value={tipo} onValueChange={setTipo}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {TIPOS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div>
-                <Label>Valor *</Label>
-                <div className="relative">
-                  <Input
-                    type={showValor ? "text" : "password"}
-                    placeholder="Cole a chave ou token aqui"
-                    value={valor}
-                    onChange={e => setValor(e.target.value)}
-                    className="pr-10"
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    onClick={() => setShowValor(!showValor)}
-                  >
-                    {showValor ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-              <div>
-                <Label>URL do Serviço</Label>
-                <Input placeholder="https://aistudio.google.com" value={urlServico} onChange={e => setUrlServico(e.target.value)} />
-              </div>
-              <div>
-                <Label>Data de Expiração</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !expiraEm && "text-muted-foreground")}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {expiraEm ? format(expiraEm, "dd/MM/yyyy", { locale: ptBR }) : "Sem expiração"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={expiraEm} onSelect={setExpiraEm} className="p-3 pointer-events-auto" />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div>
-                <Label>Notas</Label>
-                <Textarea placeholder="Observações opcionais" value={notas} onChange={e => setNotas(e.target.value)} rows={2} />
-              </div>
-            </div>
-            <DialogFooter>
-              <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
-              <Button onClick={handleSave}>{editId ? "Salvar" : "Criar"}</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Buscar credenciais..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
-      </div>
+        {/* Search */}
+        <div className="relative max-w-sm mt-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Buscar credenciais..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
 
-      {/* Table */}
-      {filtered.length === 0 ? (
-        <Card className="glass-card">
-          <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-            <KeyRound className="h-12 w-12 mb-4 opacity-40" />
-            <p>Nenhuma credencial cadastrada.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="glass-card overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Serviço</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Valor</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Expiração</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map(cred => {
-                  const isRevealed = revealedIds.has(cred.id);
-                  const daysUntilExpiry = cred.expira_em ? differenceInDays(new Date(cred.expira_em), new Date()) : null;
-                  const expiringSoon = daysUntilExpiry !== null && daysUntilExpiry <= 7 && daysUntilExpiry >= 0;
-                  const expired = daysUntilExpiry !== null && daysUntilExpiry < 0;
+        <TabsContent value="vision_ai">
+          <CredentialsTable
+            credentials={filtered}
+            revealedIds={revealedIds}
+            onToggleReveal={toggleReveal}
+            onCopy={copyToClipboard}
+            onToggleAtivo={toggleAtivo}
+            onEdit={openEdit}
+            onDelete={setDeleteId}
+            emptyMessage="Nenhuma credencial da Vision AI cadastrada."
+          />
+        </TabsContent>
 
-                  return (
-                    <TableRow key={cred.id}>
-                      <TableCell className="font-medium">{cred.nome}</TableCell>
-                      <TableCell>{cred.servico}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="capitalize text-xs">
-                          {TIPOS.find(t => t.value === cred.tipo)?.label || cred.tipo}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <code className="text-xs bg-muted px-2 py-0.5 rounded font-mono">
-                            {isRevealed ? cred.valor : maskedValue(cred.valor)}
-                          </code>
-                          <button onClick={() => toggleReveal(cred.id)} className="text-muted-foreground hover:text-foreground">
-                            {isRevealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                          </button>
-                          <button onClick={() => copyToClipboard(cred.valor)} className="text-muted-foreground hover:text-foreground">
-                            <Copy className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={cred.ativo ? "bg-success/20 text-success" : "bg-muted text-muted-foreground"}>
-                          {cred.ativo ? "Ativo" : "Inativo"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {cred.expira_em ? (
-                          <div className="flex items-center gap-1">
-                            {(expiringSoon || expired) && <AlertTriangle className="h-3.5 w-3.5 text-warning" />}
-                            <span className={cn("text-xs", expired && "text-destructive", expiringSoon && "text-warning")}>
-                              {format(new Date(cred.expira_em), "dd/MM/yyyy")}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Switch checked={cred.ativo} onCheckedChange={() => toggleAtivo(cred.id, cred.ativo)} className="mr-2" />
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(cred)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteId(cred.id)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
-      )}
+        <TabsContent value="cliente">
+          <CredentialsTable
+            credentials={filtered}
+            revealedIds={revealedIds}
+            onToggleReveal={toggleReveal}
+            onCopy={copyToClipboard}
+            onToggleAtivo={toggleAtivo}
+            onEdit={openEdit}
+            onDelete={setDeleteId}
+            emptyMessage="Nenhuma credencial de clientes cadastrada."
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Delete confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
@@ -398,3 +359,118 @@ export default function Credenciais() {
     </div>
   );
 }
+
+// Extracted table component
+function CredentialsTable({
+  credentials,
+  revealedIds,
+  onToggleReveal,
+  onCopy,
+  onToggleAtivo,
+  onEdit,
+  onDelete,
+  emptyMessage,
+}: {
+  credentials: Credential[];
+  revealedIds: Set<string>;
+  onToggleReveal: (id: string) => void;
+  onCopy: (val: string) => void;
+  onToggleAtivo: (id: string, ativo: boolean) => void;
+  onEdit: (cred: Credential) => void;
+  onDelete: (id: string) => void;
+  emptyMessage: string;
+}) {
+  if (credentials.length === 0) {
+    return (
+      <Card className="glass-card">
+        <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+          <KeyRound className="h-12 w-12 mb-4 opacity-40" />
+          <p>{emptyMessage}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="glass-card overflow-hidden">
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nome</TableHead>
+              <TableHead>Serviço</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead>Valor</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Expiração</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {credentials.map(cred => {
+              const isRevealed = revealedIds.has(cred.id);
+              const daysUntilExpiry = cred.expira_em ? differenceInDays(new Date(cred.expira_em), new Date()) : null;
+              const expiringSoon = daysUntilExpiry !== null && daysUntilExpiry <= 7 && daysUntilExpiry >= 0;
+              const expired = daysUntilExpiry !== null && daysUntilExpiry < 0;
+
+              return (
+                <TableRow key={cred.id}>
+                  <TableCell className="font-medium">{cred.nome}</TableCell>
+                  <TableCell>{cred.servico}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="capitalize text-xs">
+                      {TIPOS.find(t => t.value === cred.tipo)?.label || cred.tipo}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <code className="text-xs bg-muted px-2 py-0.5 rounded font-mono">
+                        {isRevealed ? cred.valor : maskedValue(cred.valor)}
+                      </code>
+                      <button onClick={() => onToggleReveal(cred.id)} className="text-muted-foreground hover:text-foreground">
+                        {isRevealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                      <button onClick={() => onCopy(cred.valor)} className="text-muted-foreground hover:text-foreground">
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={cred.ativo ? "bg-success/20 text-success" : "bg-muted text-muted-foreground"}>
+                      {cred.ativo ? "Ativo" : "Inativo"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {cred.expira_em ? (
+                      <div className="flex items-center gap-1">
+                        {(expiringSoon || expired) && <AlertTriangle className="h-3.5 w-3.5 text-warning" />}
+                        <span className={cn("text-xs", expired && "text-destructive", expiringSoon && "text-warning")}>
+                          {format(new Date(cred.expira_em), "dd/MM/yyyy")}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Switch checked={cred.ativo} onCheckedChange={() => onToggleAtivo(cred.id, cred.ativo)} className="mr-2" />
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(cred)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(cred.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </Card>
+  );
+}
+
+const TIPOS_CONST = TIPOS;
