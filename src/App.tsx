@@ -54,6 +54,7 @@ function AppRoutes() {
         <Route path="/comunicacoes" element={<Comunicacoes />} />
         <Route path="/contratos" element={<Contratos />} />
         <Route path="/financeiro" element={<Financeiro />} />
+        <Route path="/configuracoes/credenciais" element={<Credenciais />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
