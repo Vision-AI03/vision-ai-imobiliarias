@@ -94,6 +94,54 @@ export type Database = {
         }
         Relationships: []
       }
+      credentials: {
+        Row: {
+          ativo: boolean | null
+          created_at: string | null
+          expira_em: string | null
+          id: string
+          nome: string
+          notas: string | null
+          servico: string
+          tipo: string
+          ultimo_uso: string | null
+          updated_at: string | null
+          url_servico: string | null
+          user_id: string
+          valor: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string | null
+          expira_em?: string | null
+          id?: string
+          nome: string
+          notas?: string | null
+          servico: string
+          tipo?: string
+          ultimo_uso?: string | null
+          updated_at?: string | null
+          url_servico?: string | null
+          user_id: string
+          valor: string
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string | null
+          expira_em?: string | null
+          id?: string
+          nome?: string
+          notas?: string | null
+          servico?: string
+          tipo?: string
+          ultimo_uso?: string | null
+          updated_at?: string | null
+          url_servico?: string | null
+          user_id?: string
+          valor?: string
+        }
+        Relationships: []
+      }
       custos: {
         Row: {
           ativo: boolean

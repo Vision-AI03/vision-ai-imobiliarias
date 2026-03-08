@@ -13,6 +13,7 @@ import CRM from "./pages/CRM";
 import Comunicacoes from "./pages/Comunicacoes";
 import Contratos from "./pages/Contratos";
 import Financeiro from "./pages/Financeiro";
+import Credenciais from "./pages/Credenciais";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -53,6 +54,7 @@ function AppRoutes() {
         <Route path="/comunicacoes" element={<Comunicacoes />} />
         <Route path="/contratos" element={<Contratos />} />
         <Route path="/financeiro" element={<Financeiro />} />
+        <Route path="/configuracoes/credenciais" element={<Credenciais />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
