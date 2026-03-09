@@ -181,6 +181,42 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Clean up stale notifications referencing deleted entities
+    // Delete notifications about leads that no longer exist
+    const { data: allLeadNotifs } = await supabaseAdmin
+      .from("notificacoes")
+      .select("id, metadata")
+      .eq("user_id", userId)
+      .in("tipo", ["lead_parado", "novo_lead_webhook"]);
+
+    if (allLeadNotifs && allLeadNotifs.length > 0) {
+      const leadIds = [...new Set(allLeadNotifs
+        .map((n) => (n.metadata as Record<string, unknown>)?.lead_id as string)
+        .filter(Boolean))];
+      
+      if (leadIds.length > 0) {
+        const { data: existingLeads } = await supabaseAdmin
+          .from("leads")
+          .select("id")
+          .in("id", leadIds);
+        
+        const existingLeadIds = new Set((existingLeads || []).map((l) => l.id));
+        const staleNotifIds = allLeadNotifs
+          .filter((n) => {
+            const lid = (n.metadata as Record<string, unknown>)?.lead_id as string;
+            return lid && !existingLeadIds.has(lid);
+          })
+          .map((n) => n.id);
+        
+        if (staleNotifIds.length > 0) {
+          await supabaseAdmin
+            .from("notificacoes")
+            .delete()
+            .in("id", staleNotifIds);
+        }
+      }
+    }
+
     // Deduplicate: don't create if similar notification exists in last 24h
     const oneDayAgo = new Date(now.getTime() - 86400000).toISOString();
     const { data: recentNotifs } = await supabaseAdmin
