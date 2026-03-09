@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, MessageSquare, FileText, DollarSign, LogOut, Zap, Settings, KeyRound, CheckSquare, DatabaseBackup } from "lucide-react";
+import { LayoutDashboard, Users, MessageSquare, FileText, DollarSign, LogOut, Zap, Settings, KeyRound, CheckSquare, DatabaseBackup, Webhook } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { supabase } from "@/integrations/supabase/client";
 import {
