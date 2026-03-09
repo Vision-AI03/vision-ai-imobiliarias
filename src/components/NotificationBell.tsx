@@ -59,6 +59,10 @@ export function NotificationBell() {
     // Generate notifications on load
     supabase.functions.invoke("generate-notifications").catch(() => {});
 
+    // Auto-open popover for 2 minutes on login
+    setOpen(true);
+    const autoCloseTimer = setTimeout(() => setOpen(false), 2 * 60 * 1000);
+
     // Realtime subscription
     const channel = supabase
       .channel("notificacoes-realtime")
@@ -74,6 +78,7 @@ export function NotificationBell() {
       .subscribe();
 
     return () => {
+      clearTimeout(autoCloseTimer);
       supabase.removeChannel(channel);
     };
   }, [fetchNotificacoes]);
