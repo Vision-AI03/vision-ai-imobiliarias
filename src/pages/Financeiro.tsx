@@ -531,12 +531,7 @@ export default function Financeiro() {
                     <div className="space-y-3">
                       <div className="space-y-1.5">
                         <Label className="text-xs">Categoria *</Label>
-                        <Select value={transCategoria} onValueChange={setTransCategoria}>
-                          <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                          <SelectContent>
-                            {CATEGORIAS_DESPESA.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
+                        <Input value={transCategoria} onChange={e => setTransCategoria(e.target.value)} placeholder="Ex: Aluguel, Internet, Luz" />
                       </div>
                       <div className="space-y-1.5">
                         <Label className="text-xs">Descrição *</Label>
