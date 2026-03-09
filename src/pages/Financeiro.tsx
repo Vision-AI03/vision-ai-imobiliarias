@@ -531,12 +531,7 @@ export default function Financeiro() {
                     <div className="space-y-3">
                       <div className="space-y-1.5">
                         <Label className="text-xs">Categoria *</Label>
-                        <Select value={transCategoria} onValueChange={setTransCategoria}>
-                          <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                          <SelectContent>
-                            {CATEGORIAS_DESPESA.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
+                        <Input value={transCategoria} onChange={e => setTransCategoria(e.target.value)} placeholder="Ex: Aluguel, Internet, Luz" />
                       </div>
                       <div className="space-y-1.5">
                         <Label className="text-xs">Descrição *</Label>
@@ -614,7 +609,7 @@ export default function Financeiro() {
                 custoNome={custoNome} setCustoNome={setCustoNome} custoCategoria={custoCategoria} setCustoCategoria={setCustoCategoria}
                 custoValor={custoValor} setCustoValor={setCustoValor} custoRenovacao={custoRenovacao} setCustoRenovacao={setCustoRenovacao}
                 saving={saving} handleSalvarCusto={() => { setCustoEscopo("pessoal"); handleSalvarCusto(); }} toggleCusto={toggleCusto}
-                handleExcluirCusto={handleExcluirCusto} handleEditarCusto={handleEditarCusto} />
+                handleExcluirCusto={handleExcluirCusto} handleEditarCusto={handleEditarCusto} escopo="pessoal" />
             </TabsContent>
           </Tabs>
         </TabsContent>
@@ -640,7 +635,8 @@ function SummaryCard({ icon, title, value, subtitle, accent }: { icon: React.Rea
   );
 }
 
-function CustosSection({ custos, totalCusto, novoCustoOpen, setNovoCustoOpen, custoNome, setCustoNome, custoCategoria, setCustoCategoria, custoValor, setCustoValor, custoRenovacao, setCustoRenovacao, saving, handleSalvarCusto, toggleCusto, handleExcluirCusto, handleEditarCusto }: any) {
+function CustosSection({ custos, totalCusto, novoCustoOpen, setNovoCustoOpen, custoNome, setCustoNome, custoCategoria, setCustoCategoria, custoValor, setCustoValor, custoRenovacao, setCustoRenovacao, saving, handleSalvarCusto, toggleCusto, handleExcluirCusto, handleEditarCusto, escopo = "empresa" }: any) {
+  const isPessoal = escopo === "pessoal";
   const [editId, setEditId] = useState<string | null>(null);
   const [editNome, setEditNome] = useState("");
   const [editCategoria, setEditCategoria] = useState("outro");
@@ -681,16 +677,20 @@ function CustosSection({ custos, totalCusto, novoCustoOpen, setNovoCustoOpen, cu
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Categoria</Label>
-                  <Select value={custoCategoria} onValueChange={setCustoCategoria}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="vps">VPS</SelectItem>
-                      <SelectItem value="api">API</SelectItem>
-                      <SelectItem value="token">Token</SelectItem>
-                      <SelectItem value="ferramenta">Ferramenta</SelectItem>
-                      <SelectItem value="outro">Outro</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {isPessoal ? (
+                    <Input value={custoCategoria} onChange={(e: any) => setCustoCategoria(e.target.value)} placeholder="Ex: Aluguel, Internet, Luz" />
+                  ) : (
+                    <Select value={custoCategoria} onValueChange={setCustoCategoria}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="vps">VPS</SelectItem>
+                        <SelectItem value="api">API</SelectItem>
+                        <SelectItem value="token">Token</SelectItem>
+                        <SelectItem value="ferramenta">Ferramenta</SelectItem>
+                        <SelectItem value="outro">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Valor Mensal *</Label>
@@ -744,16 +744,20 @@ function CustosSection({ custos, totalCusto, novoCustoOpen, setNovoCustoOpen, cu
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1.5">
                             <Label className="text-xs">Categoria</Label>
-                            <Select value={editCategoria} onValueChange={setEditCategoria}>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="vps">VPS</SelectItem>
-                                <SelectItem value="api">API</SelectItem>
-                                <SelectItem value="token">Token</SelectItem>
-                                <SelectItem value="ferramenta">Ferramenta</SelectItem>
-                                <SelectItem value="outro">Outro</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            {isPessoal ? (
+                              <Input value={editCategoria} onChange={(e: any) => setEditCategoria(e.target.value)} placeholder="Ex: Aluguel, Internet" />
+                            ) : (
+                              <Select value={editCategoria} onValueChange={setEditCategoria}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="vps">VPS</SelectItem>
+                                  <SelectItem value="api">API</SelectItem>
+                                  <SelectItem value="token">Token</SelectItem>
+                                  <SelectItem value="ferramenta">Ferramenta</SelectItem>
+                                  <SelectItem value="outro">Outro</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
                           </div>
                           <div className="space-y-1.5">
                             <Label className="text-xs">Valor Mensal *</Label>
