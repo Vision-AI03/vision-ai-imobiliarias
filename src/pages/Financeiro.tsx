@@ -635,7 +635,8 @@ function SummaryCard({ icon, title, value, subtitle, accent }: { icon: React.Rea
   );
 }
 
-function CustosSection({ custos, totalCusto, novoCustoOpen, setNovoCustoOpen, custoNome, setCustoNome, custoCategoria, setCustoCategoria, custoValor, setCustoValor, custoRenovacao, setCustoRenovacao, saving, handleSalvarCusto, toggleCusto, handleExcluirCusto, handleEditarCusto }: any) {
+function CustosSection({ custos, totalCusto, novoCustoOpen, setNovoCustoOpen, custoNome, setCustoNome, custoCategoria, setCustoCategoria, custoValor, setCustoValor, custoRenovacao, setCustoRenovacao, saving, handleSalvarCusto, toggleCusto, handleExcluirCusto, handleEditarCusto, escopo = "empresa" }: any) {
+  const isPessoal = escopo === "pessoal";
   const [editId, setEditId] = useState<string | null>(null);
   const [editNome, setEditNome] = useState("");
   const [editCategoria, setEditCategoria] = useState("outro");
