@@ -30,7 +30,7 @@ export default function Auth() {
       <Card className="w-full max-w-md glass-card">
         <CardHeader className="text-center space-y-4 pb-2">
           <div className="flex items-center justify-center gap-2.5">
-            <img src={logoVision} alt="Vision AI" cl2 w-12e="h-10 w-10 object-contain" />
+            <img src={logoVision} alt="Vision AI" className="h-12 w-12 object-contain" />
             <h1 className="text-3xl font-bold gradient-primary-text">Vision AI</h1>
           </div>
           <p className="text-muted-foreground text-sm">Sistema de gestão interno</p>
