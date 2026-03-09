@@ -165,6 +165,10 @@ export default function CRM() {
         onClose={() => setDrawerOpen(false)}
         onStatusChange={handleStatusChange}
         onLeadUpdate={handleLeadUpdate}
+        onLeadDelete={(leadId) => {
+          setLeads(prev => prev.filter(l => l.id !== leadId));
+          setDrawerOpen(false);
+        }}
       />
     </div>
   );

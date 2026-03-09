@@ -5,7 +5,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Mail, MailCheck, MessageSquare, CheckCheck, ExternalLink, Calendar, Building2, User, Globe, Linkedin, Sparkles, Loader2, Send } from "lucide-react";
+import { Mail, MailCheck, MessageSquare, CheckCheck, ExternalLink, Calendar, Building2, User, Globe, Linkedin, Sparkles, Loader2, Send, Trash2 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,15 +42,17 @@ interface LeadDrawerProps {
   onClose: () => void;
   onStatusChange: (leadId: string, newStatus: string) => void;
   onLeadUpdate?: (lead: Lead) => void;
+  onLeadDelete?: (leadId: string) => void;
 }
 
-export default function LeadDrawer({ lead, open, onClose, onStatusChange, onLeadUpdate }: LeadDrawerProps) {
+export default function LeadDrawer({ lead, open, onClose, onStatusChange, onLeadUpdate, onLeadDelete }: LeadDrawerProps) {
   const [anotacoes, setAnotacoes] = useState("");
   const [comunicacoes, setComunicacoes] = useState<Tables<"comunicacoes">[]>([]);
   const [enriching, setEnriching] = useState(false);
   const [generatingEmail, setGeneratingEmail] = useState(false);
   const [emailDraft, setEmailDraft] = useState<{ assunto: string; conteudo: string } | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -69,6 +75,20 @@ export default function LeadDrawer({ lead, open, onClose, onStatusChange, onLead
   async function salvarAnotacoes() {
     if (!lead) return;
     await supabase.from("leads").update({ mensagem_original: anotacoes }).eq("id", lead.id);
+  }
+
+  async function handleDeleteLead() {
+    if (!lead) return;
+    setDeleting(true);
+    const { error } = await supabase.from("leads").delete().eq("id", lead.id);
+    if (error) {
+      toast({ title: "Erro ao excluir lead", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Lead excluído com sucesso!" });
+      onLeadDelete?.(lead.id);
+      onClose();
+    }
+    setDeleting(false);
   }
 
   async function handleEnrichLead() {
@@ -374,6 +394,32 @@ export default function LeadDrawer({ lead, open, onClose, onStatusChange, onLead
                 Salvar Anotações
               </Button>
             </div>
+
+            <Separator />
+
+            {/* Delete */}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="destructive" className="w-full gap-1.5" disabled={deleting}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {deleting ? "Excluindo..." : "Excluir Lead"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Excluir lead?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Tem certeza que deseja excluir <strong>{lead.nome}</strong>? Esta ação não pode ser desfeita.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeleteLead} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Excluir
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </ScrollArea>
       </SheetContent>

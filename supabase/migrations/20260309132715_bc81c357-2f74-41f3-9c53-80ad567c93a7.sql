@@ -1,0 +1,1 @@
+CREATE POLICY "Autenticados podem excluir leads" ON public.leads FOR DELETE TO public USING (auth.role() = 'authenticated'::text);
