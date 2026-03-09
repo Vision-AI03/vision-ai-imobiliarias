@@ -99,10 +99,24 @@ export default function Dashboard() {
   const [weeklyLeadsData, setWeeklyLeadsData] = useState<WeeklyLeads[]>([]);
   const [monthlyRevenueData, setMonthlyRevenueData] = useState<MonthlyRevenue[]>([]);
   const [loading, setLoading] = useState(true);
+  const [metaFaturamento, setMetaFaturamento] = useState(0);
+  const [metaMRR, setMetaMRR] = useState(0);
+  const [mrrAtual, setMrrAtual] = useState(0);
 
   useEffect(() => {
     fetchDashboardData();
+    fetchMetas();
   }, []);
+
+  async function fetchMetas() {
+    const { data } = await supabase.from("metas_financeiras").select("*") as any;
+    if (data) {
+      const fat = data.find((m: any) => m.tipo === "faturamento_mes");
+      const mrr = data.find((m: any) => m.tipo === "mrr");
+      if (fat) setMetaFaturamento(Number(fat.valor));
+      if (mrr) setMetaMRR(Number(mrr.valor));
+    }
+  }
 
   async function fetchDashboardData() {
     setLoading(true);
