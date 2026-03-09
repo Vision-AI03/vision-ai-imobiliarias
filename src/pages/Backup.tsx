@@ -132,12 +132,12 @@ export default function Backup() {
     {
       id: "credenciais",
       label: "Credenciais",
-      description: "Nomes e serviços (sem valores de chaves)",
+      description: "Todos os dados incluindo valores das chaves",
       filename: "credenciais",
       fetch: async () => {
         const { data } = await supabase
           .from("credentials")
-          .select("id,nome,servico,tipo,escopo,ativo,expira_em,url_servico,notas,created_at,updated_at");
+          .select("*");
         return (data || []) as Record<string, unknown>[];
       },
     },
