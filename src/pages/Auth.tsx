@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import logoVision from "@/assets/logo_vision.jpg";
+import logoVision from "@/assets/logo_vision.png";
 
 export default function Auth() {
   const [email, setEmail] = useState("");
