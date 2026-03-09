@@ -45,7 +45,7 @@ interface LeadDrawerProps {
   onLeadDelete?: (leadId: string) => void;
 }
 
-export default function LeadDrawer({ lead, open, onClose, onStatusChange, onLeadUpdate }: LeadDrawerProps) {
+export default function LeadDrawer({ lead, open, onClose, onStatusChange, onLeadUpdate, onLeadDelete }: LeadDrawerProps) {
   const [anotacoes, setAnotacoes] = useState("");
   const [comunicacoes, setComunicacoes] = useState<Tables<"comunicacoes">[]>([]);
   const [enriching, setEnriching] = useState(false);
