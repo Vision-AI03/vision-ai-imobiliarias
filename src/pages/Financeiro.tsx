@@ -482,88 +482,19 @@ export default function Financeiro() {
 
         {/* ============= PESSOAL TAB ============= */}
         <TabsContent value="pessoal" className="space-y-6">
-          {/* Summary cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <SummaryCard icon={<ArrowUpRight className="h-5 w-5" />} title="Receitas do Mês" value={formatCurrency(receitasPessoaisMes)} subtitle="Total de entradas" accent="text-primary" />
-            <SummaryCard icon={<ArrowDownRight className="h-5 w-5" />} title="Despesas do Mês" value={formatCurrency(despesasPessoaisMes)} subtitle={variacaoDespesas !== 0 ? `${variacaoDespesas > 0 ? "+" : ""}${variacaoDespesas}% vs mês anterior` : "Sem comparativo"} accent="text-destructive" />
-            <SummaryCard icon={<DollarSign className="h-5 w-5" />} title="Saldo do Mês" value={formatCurrency(saldoPessoalMes)} subtitle="Receitas - Despesas" accent={saldoPessoalMes >= 0 ? "text-primary" : "text-destructive"} />
-            <SummaryCard icon={<TrendingDown className="h-5 w-5" />} title="Custos Fixos Pessoais" value={formatCurrency(totalCustosPessoaisMes)} subtitle={`${custosPessoais.filter(c => c.ativo).length} custos ativos`} accent="text-accent" />
-          </div>
-
-          {/* Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card className="glass-card">
-              <CardHeader><CardTitle className="text-sm flex items-center gap-2"><PieChart className="h-4 w-4" />Despesas por Categoria</CardTitle></CardHeader>
-              <CardContent className="h-64">
-                {despesasPorCategoria.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-muted-foreground text-sm">Sem despesas neste mês</div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RechartsPie>
-                      <Pie data={despesasPorCategoria} cx="50%" cy="50%" innerRadius={50} outerRadius={90} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                        {despesasPorCategoria.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                      </Pie>
-                      <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatCurrency(v)} />
-                    </RechartsPie>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-            <Card className="glass-card">
-              <CardHeader><CardTitle className="text-sm">Receitas vs Despesas — 6 Meses</CardTitle></CardHeader>
-              <CardContent className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={pessoalBarData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 14%)" />
-                    <XAxis dataKey="mes" tick={{ fill: "hsl(0 0% 55%)", fontSize: 12 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: "hsl(0 0% 55%)", fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} />
-                    <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatCurrency(v)} />
-                    <Legend wrapperStyle={{ color: "hsl(0 0% 55%)" }} />
-                    <Bar dataKey="receitas" name="Receitas" fill="hsl(142 71% 45%)" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="despesas" name="Despesas" fill="hsl(0 72% 51%)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="glass-card">
-            <CardHeader><CardTitle className="text-sm">Evolução do Saldo Mensal</CardTitle></CardHeader>
-            <CardContent className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={saldoLineData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 14%)" />
-                  <XAxis dataKey="mes" tick={{ fill: "hsl(0 0% 55%)", fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: "hsl(0 0% 55%)", fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatCurrency(v)} />
-                  <Line type="monotone" dataKey="saldo" name="Saldo" stroke="hsl(252 100% 64%)" strokeWidth={2} dot={{ fill: "hsl(252 100% 64%)", r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* Transactions */}
-          <Tabs defaultValue="transacoes" className="space-y-4">
+          <Tabs defaultValue="contas" className="space-y-4">
             <TabsList className="bg-secondary/50">
-              <TabsTrigger value="transacoes" className="gap-1.5"><DollarSign className="h-4 w-4" />Transações</TabsTrigger>
+              <TabsTrigger value="contas" className="gap-1.5"><DollarSign className="h-4 w-4" />Contas a Pagar</TabsTrigger>
               <TabsTrigger value="custos-pessoais" className="gap-1.5"><TrendingDown className="h-4 w-4" />Custos Fixos</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="transacoes" className="space-y-4">
+            <TabsContent value="contas" className="space-y-4">
               <div className="flex flex-wrap items-center gap-3">
-                <Select value={filtroTipo} onValueChange={setFiltroTipo}>
-                  <SelectTrigger className="w-[140px]"><Filter className="h-3 w-3 mr-1" /><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    <SelectItem value="receita">Receita</SelectItem>
-                    <SelectItem value="despesa">Despesa</SelectItem>
-                  </SelectContent>
-                </Select>
                 <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
-                  <SelectTrigger className="w-[160px]"><SelectValue placeholder="Categoria" /></SelectTrigger>
+                  <SelectTrigger className="w-[160px]"><Filter className="h-3 w-3 mr-1" /><SelectValue placeholder="Categoria" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todos">Todas</SelectItem>
-                    {[...CATEGORIAS_DESPESA, ...CATEGORIAS_RECEITA].filter((v, i, a) => a.indexOf(v) === i).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {CATEGORIAS_DESPESA.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filtroMetodo} onValueChange={setFiltroMetodo}>
@@ -576,30 +507,23 @@ export default function Financeiro() {
                 <div className="flex-1" />
                 <Dialog open={novaTransOpen} onOpenChange={setNovaTransOpen}>
                   <DialogTrigger asChild>
-                    <Button className="gradient-primary text-primary-foreground gap-1.5"><Plus className="h-4 w-4" />Nova Transação</Button>
+                    <Button className="gradient-primary text-primary-foreground gap-1.5"><Plus className="h-4 w-4" />Nova Conta</Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-md bg-card border-border">
-                    <DialogHeader><DialogTitle>Nova Transação</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle>Nova Conta / Despesa</DialogTitle></DialogHeader>
                     <div className="space-y-3">
-                      <div className="flex items-center gap-3">
-                        <Label className="text-xs">Tipo:</Label>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant={transTipo === "despesa" ? "default" : "outline"} onClick={() => { setTransTipo("despesa"); setTransCategoria(""); }} className={transTipo === "despesa" ? "bg-destructive text-destructive-foreground" : ""}>Despesa</Button>
-                          <Button size="sm" variant={transTipo === "receita" ? "default" : "outline"} onClick={() => { setTransTipo("receita"); setTransCategoria(""); }} className={transTipo === "receita" ? "bg-primary text-primary-foreground" : ""}>Receita</Button>
-                        </div>
-                      </div>
                       <div className="space-y-1.5">
                         <Label className="text-xs">Categoria *</Label>
                         <Select value={transCategoria} onValueChange={setTransCategoria}>
                           <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                           <SelectContent>
-                            {(transTipo === "despesa" ? CATEGORIAS_DESPESA : CATEGORIAS_RECEITA).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                            {CATEGORIAS_DESPESA.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-1.5">
                         <Label className="text-xs">Descrição *</Label>
-                        <Input value={transDescricao} onChange={e => setTransDescricao(e.target.value)} placeholder="Ex: Almoço restaurante" />
+                        <Input value={transDescricao} onChange={e => setTransDescricao(e.target.value)} placeholder="Ex: Conta de luz" />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1.5">
@@ -635,7 +559,7 @@ export default function Financeiro() {
                       </div>
                       <div className="flex justify-end gap-2 pt-2">
                         <Button variant="outline" onClick={() => setNovaTransOpen(false)}>Cancelar</Button>
-                        <Button onClick={handleSalvarTransacao} disabled={transSaving} className="gradient-primary text-primary-foreground">{transSaving ? "Salvando..." : "Salvar"}</Button>
+                        <Button onClick={() => { setTransTipo("despesa"); handleSalvarTransacao(); }} disabled={transSaving} className="gradient-primary text-primary-foreground">{transSaving ? "Salvando..." : "Salvar"}</Button>
                       </div>
                     </div>
                   </DialogContent>
@@ -643,7 +567,7 @@ export default function Financeiro() {
               </div>
 
               {transacoesFiltradas.length === 0 ? (
-                <Card className="glass-card"><CardContent className="py-8 text-center text-muted-foreground text-sm">Nenhuma transação encontrada.</CardContent></Card>
+                <Card className="glass-card"><CardContent className="py-8 text-center text-muted-foreground text-sm">Nenhuma conta encontrada.</CardContent></Card>
               ) : (
                 <Card className="glass-card overflow-hidden">
                   <Table>
@@ -657,8 +581,8 @@ export default function Financeiro() {
                           <TableCell className="text-sm font-medium">{t.descricao}</TableCell>
                           <TableCell><Badge variant="outline" className="text-[10px]">{t.categoria}</Badge></TableCell>
                           <TableCell className="text-xs text-muted-foreground">{t.metodo_pagamento || "—"}</TableCell>
-                          <TableCell className={cn("text-right font-bold text-sm", t.tipo === "receita" ? "text-primary" : "text-destructive")}>
-                            {t.tipo === "receita" ? "+" : "-"}{formatCurrency(Number(t.valor))}
+                          <TableCell className="text-right font-bold text-sm text-destructive">
+                            -{formatCurrency(Number(t.valor))}
                           </TableCell>
                         </TableRow>
                       ))}
