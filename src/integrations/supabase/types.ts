@@ -474,6 +474,7 @@ export type Database = {
           nome: string
           oportunidades: string | null
           origem: string | null
+          origem_metadata: Json | null
           porte_empresa: string | null
           prioridade_contato: string | null
           resumo_empresa: string | null
@@ -511,6 +512,7 @@ export type Database = {
           nome: string
           oportunidades?: string | null
           origem?: string | null
+          origem_metadata?: Json | null
           porte_empresa?: string | null
           prioridade_contato?: string | null
           resumo_empresa?: string | null
@@ -548,6 +550,7 @@ export type Database = {
           nome?: string
           oportunidades?: string | null
           origem?: string | null
+          origem_metadata?: Json | null
           porte_empresa?: string | null
           prioridade_contato?: string | null
           resumo_empresa?: string | null
