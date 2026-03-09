@@ -51,7 +51,18 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
       className="glass-card rounded-lg p-3 cursor-grab active:cursor-grabbing space-y-2 hover:border-primary/30 transition-colors"
     >
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold truncate flex-1">{lead.nome}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-sm font-semibold truncate flex-1">{lead.nome}</p>
+          {lead.origem === "website" && (
+            <Tooltip><TooltipTrigger><Globe className="h-3 w-3 text-primary shrink-0" /></TooltipTrigger><TooltipContent>Via site</TooltipContent></Tooltip>
+          )}
+          {lead.origem === "meta_ads" && (
+            <Tooltip><TooltipTrigger><Smartphone className="h-3 w-3 text-blue-500 shrink-0" /></TooltipTrigger><TooltipContent>Via Meta Ads</TooltipContent></Tooltip>
+          )}
+          {(!lead.origem || lead.origem === "manual") && (
+            <Tooltip><TooltipTrigger><Hand className="h-3 w-3 text-muted-foreground shrink-0" /></TooltipTrigger><TooltipContent>Manual</TooltipContent></Tooltip>
+          )}
+        </div>
         <Badge className={`text-[10px] px-1.5 py-0 ml-1 ${getScoreBadge(lead.score)}`}>
           {lead.score ?? 0}
         </Badge>

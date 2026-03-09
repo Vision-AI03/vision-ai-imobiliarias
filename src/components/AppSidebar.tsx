@@ -22,6 +22,7 @@ const items = [
   { title: "Tarefas", url: "/tarefas", icon: CheckSquare },
   { title: "Credenciais", url: "/configuracoes/credenciais", icon: KeyRound },
   { title: "Backup", url: "/configuracoes/backup", icon: DatabaseBackup },
+  { title: "Integrações", url: "/configuracoes/integracoes", icon: Webhook },
 ];
 
 export function AppSidebar() {
