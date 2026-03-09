@@ -370,7 +370,74 @@ export default function Financeiro() {
             <SummaryCard icon={<TrendingUp className="h-5 w-5" />} title="MRR Atual" value={formatCurrency(mrrAtual)} subtitle={`${recorrencias.filter(r => r.ativo).length} contratos ativos`} accent="text-accent" />
           </div>
 
-          {/* NEW: LTV + Projeção */}
+          {/* Metas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="glass-card">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-2"><Target className="h-4 w-4 text-primary" />Meta de Faturamento</CardTitle>
+                <Dialog open={metasOpen} onOpenChange={setMetasOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs gap-1"><Pencil className="h-3 w-3" />Editar Metas</Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-sm bg-card border-border">
+                    <DialogHeader><DialogTitle>Definir Metas</DialogTitle></DialogHeader>
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Meta de Faturamento Mensal (R$)</Label>
+                        <Input type="number" value={editMetaFat} onChange={e => setEditMetaFat(e.target.value)} placeholder="50000" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Meta de MRR (R$)</Label>
+                        <Input type="number" value={editMetaMrr} onChange={e => setEditMetaMrr(e.target.value)} placeholder="20000" />
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setMetasOpen(false)}>Cancelar</Button>
+                        <Button onClick={handleSalvarMetas} className="gradient-primary text-primary-foreground">Salvar</Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                {metaFaturamento > 0 ? (
+                  <>
+                    <div className="flex items-end justify-between mb-2">
+                      <p className="text-2xl font-bold text-primary">{formatCurrency(receitaTotal)}</p>
+                      <p className="text-xs text-muted-foreground">de {formatCurrency(metaFaturamento)}</p>
+                    </div>
+                    <Progress value={Math.min((receitaTotal / metaFaturamento) * 100, 100)} className="h-3" />
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      {Math.round((receitaTotal / metaFaturamento) * 100)}% da meta — faltam {formatCurrency(Math.max(metaFaturamento - receitaTotal, 0))}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-2">Defina sua meta clicando em "Editar Metas"</p>
+                )}
+              </CardContent>
+            </Card>
+            <Card className="glass-card">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2"><Target className="h-4 w-4 text-accent" />Meta de MRR</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {metaMRR > 0 ? (
+                  <>
+                    <div className="flex items-end justify-between mb-2">
+                      <p className="text-2xl font-bold text-accent">{formatCurrency(mrrAtual)}</p>
+                      <p className="text-xs text-muted-foreground">de {formatCurrency(metaMRR)}</p>
+                    </div>
+                    <Progress value={Math.min((mrrAtual / metaMRR) * 100, 100)} className="h-3" />
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      {Math.round((mrrAtual / metaMRR) * 100)}% da meta — faltam {formatCurrency(Math.max(metaMRR - mrrAtual, 0))}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-2">Defina sua meta clicando em "Editar Metas"</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card className="glass-card">
               <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Wallet className="h-4 w-4 text-primary" />LTV Médio por Cliente</CardTitle></CardHeader>
