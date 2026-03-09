@@ -609,7 +609,7 @@ export default function Financeiro() {
                 custoNome={custoNome} setCustoNome={setCustoNome} custoCategoria={custoCategoria} setCustoCategoria={setCustoCategoria}
                 custoValor={custoValor} setCustoValor={setCustoValor} custoRenovacao={custoRenovacao} setCustoRenovacao={setCustoRenovacao}
                 saving={saving} handleSalvarCusto={() => { setCustoEscopo("pessoal"); handleSalvarCusto(); }} toggleCusto={toggleCusto}
-                handleExcluirCusto={handleExcluirCusto} handleEditarCusto={handleEditarCusto} />
+                handleExcluirCusto={handleExcluirCusto} handleEditarCusto={handleEditarCusto} escopo="pessoal" />
             </TabsContent>
           </Tabs>
         </TabsContent>
