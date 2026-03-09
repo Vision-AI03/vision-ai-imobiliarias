@@ -202,10 +202,10 @@ export default function Backup() {
         <p className="text-muted-foreground">Exporte seus dados em CSV ou JSON para backup ou análise externa.</p>
       </div>
 
-      <Alert>
+      <Alert variant="destructive">
         <ShieldAlert className="h-4 w-4" />
         <AlertDescription>
-          As credenciais são exportadas <strong>sem os valores das chaves</strong> por segurança. Apenas nomes, serviços e datas de expiração são incluídos.
+          <strong>Atenção:</strong> As credenciais são exportadas <strong>com os valores das chaves</strong>. Mantenha o arquivo de backup em local seguro e não compartilhe com terceiros.
         </AlertDescription>
       </Alert>
 
