@@ -51,6 +51,7 @@ export default function LeadDrawer({ lead, open, onClose, onStatusChange, onLead
   const [enriching, setEnriching] = useState(false);
   const [generatingEmail, setGeneratingEmail] = useState(false);
   const [emailDraft, setEmailDraft] = useState<{ assunto: string; conteudo: string } | null>(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
 
