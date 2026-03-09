@@ -14,6 +14,7 @@ import Comunicacoes from "./pages/Comunicacoes";
 import Contratos from "./pages/Contratos";
 import Financeiro from "./pages/Financeiro";
 import Credenciais from "./pages/Credenciais";
+import Integracoes from "./pages/Integracoes";
 import Tarefas from "./pages/Tarefas";
 import Backup from "./pages/Backup";
 import Notificacoes from "./pages/Notificacoes";
