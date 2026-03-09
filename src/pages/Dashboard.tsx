@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Users, Calendar, Mail, MessageSquare, DollarSign, TrendingUp, CheckSquare, AlertTriangle, Clock,
-  Plus, FileText, Upload, Zap,
+  Plus, FileText, Upload, Target,
 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
