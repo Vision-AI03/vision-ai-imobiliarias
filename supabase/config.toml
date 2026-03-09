@@ -29,3 +29,9 @@ verify_jwt = false
 
 [functions.generate-notifications]
 verify_jwt = false
+
+[functions.capture-lead-website]
+verify_jwt = false
+
+[functions.capture-lead-meta]
+verify_jwt = false
