@@ -77,6 +77,20 @@ export default function LeadDrawer({ lead, open, onClose, onStatusChange, onLead
     await supabase.from("leads").update({ mensagem_original: anotacoes }).eq("id", lead.id);
   }
 
+  async function handleDeleteLead() {
+    if (!lead) return;
+    setDeleting(true);
+    const { error } = await supabase.from("leads").delete().eq("id", lead.id);
+    if (error) {
+      toast({ title: "Erro ao excluir lead", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Lead excluído com sucesso!" });
+      onLeadDelete?.(lead.id);
+      onClose();
+    }
+    setDeleting(false);
+  }
+
   async function handleEnrichLead() {
     if (!lead) return;
     setEnriching(true);
