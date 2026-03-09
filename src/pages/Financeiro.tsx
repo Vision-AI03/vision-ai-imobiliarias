@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   DollarSign, TrendingUp, TrendingDown, Plus, BarChart3, ArrowUpRight, ArrowDownRight,
-  Building2, User, CalendarIcon, Filter, Wallet, PieChart,
+  Building2, User, CalendarIcon, Filter, Wallet, PieChart, Pencil, Trash2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, subMonths, differenceInMonths } from "date-fns";
@@ -162,6 +163,21 @@ export default function Financeiro() {
   }
 
   async function toggleCusto(id: string, ativo: boolean) { await supabase.from("custos").update({ ativo }).eq("id", id); fetchAll(); }
+
+  async function handleExcluirCusto(id: string) {
+    const { error } = await supabase.from("custos").delete().eq("id", id);
+    if (error) { toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" }); }
+    else { toast({ title: "Custo excluído!" }); fetchAll(); }
+  }
+
+  async function handleEditarCusto(id: string, nome: string, categoria: string, valorMensal: string, renovacao: string) {
+    if (!nome || !valorMensal) { toast({ title: "Preencha nome e valor", variant: "destructive" }); return; }
+    const { error } = await supabase.from("custos").update({
+      nome: nome.trim(), categoria, valor_mensal: parseFloat(valorMensal), data_renovacao: renovacao || null,
+    }).eq("id", id);
+    if (error) { toast({ title: "Erro ao editar", description: error.message, variant: "destructive" }); }
+    else { toast({ title: "Custo atualizado!" }); fetchAll(); }
+  }
 
   async function handleSalvarTransacao() {
     if (!transDescricao || !transValor || !transCategoria) { toast({ title: "Preencha os campos obrigatórios", variant: "destructive" }); return; }
@@ -475,7 +491,8 @@ export default function Financeiro() {
               <CustosSection custos={custosEmpresa} totalCusto={totalCustosEmpresaMes} novoCustoOpen={novoCustoOpen} setNovoCustoOpen={setNovoCustoOpen}
                 custoNome={custoNome} setCustoNome={setCustoNome} custoCategoria={custoCategoria} setCustoCategoria={setCustoCategoria}
                 custoValor={custoValor} setCustoValor={setCustoValor} custoRenovacao={custoRenovacao} setCustoRenovacao={setCustoRenovacao}
-                saving={saving} handleSalvarCusto={() => { setCustoEscopo("empresa"); handleSalvarCusto(); }} toggleCusto={toggleCusto} />
+                saving={saving} handleSalvarCusto={() => { setCustoEscopo("empresa"); handleSalvarCusto(); }} toggleCusto={toggleCusto}
+                handleExcluirCusto={handleExcluirCusto} handleEditarCusto={handleEditarCusto} />
             </TabsContent>
           </Tabs>
         </TabsContent>
@@ -596,7 +613,8 @@ export default function Financeiro() {
               <CustosSection custos={custosPessoais} totalCusto={totalCustosPessoaisMes} novoCustoOpen={novoCustoOpen} setNovoCustoOpen={setNovoCustoOpen}
                 custoNome={custoNome} setCustoNome={setCustoNome} custoCategoria={custoCategoria} setCustoCategoria={setCustoCategoria}
                 custoValor={custoValor} setCustoValor={setCustoValor} custoRenovacao={custoRenovacao} setCustoRenovacao={setCustoRenovacao}
-                saving={saving} handleSalvarCusto={() => { setCustoEscopo("pessoal"); handleSalvarCusto(); }} toggleCusto={toggleCusto} />
+                saving={saving} handleSalvarCusto={() => { setCustoEscopo("pessoal"); handleSalvarCusto(); }} toggleCusto={toggleCusto}
+                handleExcluirCusto={handleExcluirCusto} handleEditarCusto={handleEditarCusto} />
             </TabsContent>
           </Tabs>
         </TabsContent>
@@ -622,7 +640,21 @@ function SummaryCard({ icon, title, value, subtitle, accent }: { icon: React.Rea
   );
 }
 
-function CustosSection({ custos, totalCusto, novoCustoOpen, setNovoCustoOpen, custoNome, setCustoNome, custoCategoria, setCustoCategoria, custoValor, setCustoValor, custoRenovacao, setCustoRenovacao, saving, handleSalvarCusto, toggleCusto }: any) {
+function CustosSection({ custos, totalCusto, novoCustoOpen, setNovoCustoOpen, custoNome, setCustoNome, custoCategoria, setCustoCategoria, custoValor, setCustoValor, custoRenovacao, setCustoRenovacao, saving, handleSalvarCusto, toggleCusto, handleExcluirCusto, handleEditarCusto }: any) {
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editNome, setEditNome] = useState("");
+  const [editCategoria, setEditCategoria] = useState("outro");
+  const [editValor, setEditValor] = useState("");
+  const [editRenovacao, setEditRenovacao] = useState("");
+
+  function openEdit(c: any) {
+    setEditId(c.id);
+    setEditNome(c.nome);
+    setEditCategoria(c.categoria);
+    setEditValor(String(c.valor_mensal));
+    setEditRenovacao(c.data_renovacao || "");
+  }
+
   return (
     <>
       <div className="flex items-center justify-between">
@@ -694,7 +726,69 @@ function CustosSection({ custos, totalCusto, novoCustoOpen, setNovoCustoOpen, cu
                     </div>
                   </div>
                 </div>
-                <p className={`font-bold ${c.ativo ? "text-destructive" : "text-muted-foreground"}`}>{formatCurrency(Number(c.valor_mensal))}</p>
+                <div className="flex items-center gap-2">
+                  <p className={`font-bold ${c.ativo ? "text-destructive" : "text-muted-foreground"}`}>{formatCurrency(Number(c.valor_mensal))}</p>
+                  <Dialog open={editId === c.id} onOpenChange={(open) => { if (!open) setEditId(null); }}>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(c)}>
+                        <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md bg-card border-border">
+                      <DialogHeader><DialogTitle>Editar Custo</DialogTitle></DialogHeader>
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Nome *</Label>
+                          <Input value={editNome} onChange={(e: any) => setEditNome(e.target.value)} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">Categoria</Label>
+                            <Select value={editCategoria} onValueChange={setEditCategoria}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="vps">VPS</SelectItem>
+                                <SelectItem value="api">API</SelectItem>
+                                <SelectItem value="token">Token</SelectItem>
+                                <SelectItem value="ferramenta">Ferramenta</SelectItem>
+                                <SelectItem value="outro">Outro</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">Valor Mensal *</Label>
+                            <Input type="number" value={editValor} onChange={(e: any) => setEditValor(e.target.value)} />
+                          </div>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Data de Renovação</Label>
+                          <Input type="date" value={editRenovacao} onChange={(e: any) => setEditRenovacao(e.target.value)} />
+                        </div>
+                        <div className="flex justify-end gap-2 pt-2">
+                          <Button variant="outline" onClick={() => setEditId(null)}>Cancelar</Button>
+                          <Button className="gradient-primary text-primary-foreground" onClick={() => { handleEditarCusto(c.id, editNome, editCategoria, editValor, editRenovacao); setEditId(null); }}>Salvar</Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir custo</AlertDialogTitle>
+                        <AlertDialogDescription>Tem certeza que deseja excluir "{c.nome}"? Esta ação não pode ser desfeita.</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleExcluirCusto(c.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Excluir</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </CardContent>
             </Card>
           ))}
