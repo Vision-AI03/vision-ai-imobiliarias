@@ -132,12 +132,12 @@ export default function Backup() {
     {
       id: "credenciais",
       label: "Credenciais",
-      description: "Nomes e serviços (sem valores de chaves)",
+      description: "Todos os dados incluindo valores das chaves",
       filename: "credenciais",
       fetch: async () => {
         const { data } = await supabase
           .from("credentials")
-          .select("id,nome,servico,tipo,escopo,ativo,expira_em,url_servico,notas,created_at,updated_at");
+          .select("*");
         return (data || []) as Record<string, unknown>[];
       },
     },
@@ -202,10 +202,10 @@ export default function Backup() {
         <p className="text-muted-foreground">Exporte seus dados em CSV ou JSON para backup ou análise externa.</p>
       </div>
 
-      <Alert>
+      <Alert variant="destructive">
         <ShieldAlert className="h-4 w-4" />
         <AlertDescription>
-          As credenciais são exportadas <strong>sem os valores das chaves</strong> por segurança. Apenas nomes, serviços e datas de expiração são incluídos.
+          <strong>Atenção:</strong> As credenciais são exportadas <strong>com os valores das chaves</strong>. Mantenha o arquivo de backup em local seguro e não compartilhe com terceiros.
         </AlertDescription>
       </Alert>
 
