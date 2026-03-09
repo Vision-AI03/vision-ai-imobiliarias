@@ -293,7 +293,46 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* NEW: Tarefas de Hoje + Cadência Emails + Contratos Pendentes */}
+      {/* Metas de Faturamento e MRR */}
+      {(metaFaturamento > 0 || metaMRR > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {metaFaturamento > 0 && (
+            <Card className="glass-card">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2"><Target className="h-4 w-4 text-primary" />Meta de Faturamento</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-end justify-between mb-2">
+                  <p className="text-xl font-bold text-primary">{formatCurrency(kpis.faturamentoMes)}</p>
+                  <p className="text-xs text-muted-foreground">de {formatCurrency(metaFaturamento)}</p>
+                </div>
+                <Progress value={Math.min((kpis.faturamentoMes / metaFaturamento) * 100, 100)} className="h-2.5" />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {Math.round((kpis.faturamentoMes / metaFaturamento) * 100)}% — faltam {formatCurrency(Math.max(metaFaturamento - kpis.faturamentoMes, 0))}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+          {metaMRR > 0 && (
+            <Card className="glass-card">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2"><Target className="h-4 w-4 text-accent" />Meta de MRR</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-end justify-between mb-2">
+                  <p className="text-xl font-bold text-accent">{formatCurrency(mrrAtual)}</p>
+                  <p className="text-xs text-muted-foreground">de {formatCurrency(metaMRR)}</p>
+                </div>
+                <Progress value={Math.min((mrrAtual / metaMRR) * 100, 100)} className="h-2.5" />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {Math.round((mrrAtual / metaMRR) * 100)}% — faltam {formatCurrency(Math.max(metaMRR - mrrAtual, 0))}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Tarefas de Hoje */}
         <Card className="glass-card">
