@@ -35,7 +35,7 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="p-4 border-b border-border">
         <div className="flex items-center gap-2">
-          <Zap className="h-6 w-6 text-primary" />
+          <img src={logoVision} alt="Vision AI" className="h-8 w-8 rounded-md object-cover" />
           <span className="text-lg font-bold gradient-primary-text">Vision AI</span>
         </div>
       </SidebarHeader>
