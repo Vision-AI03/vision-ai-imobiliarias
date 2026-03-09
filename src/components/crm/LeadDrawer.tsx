@@ -394,6 +394,32 @@ export default function LeadDrawer({ lead, open, onClose, onStatusChange, onLead
                 Salvar Anotações
               </Button>
             </div>
+
+            <Separator />
+
+            {/* Delete */}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="destructive" className="w-full gap-1.5" disabled={deleting}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {deleting ? "Excluindo..." : "Excluir Lead"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Excluir lead?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Tem certeza que deseja excluir <strong>{lead.nome}</strong>? Esta ação não pode ser desfeita.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeleteLead} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Excluir
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </ScrollArea>
       </SheetContent>
