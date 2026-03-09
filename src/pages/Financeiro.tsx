@@ -152,6 +152,7 @@ export default function Financeiro() {
     else { toast({ title: "Metas atualizadas!" }); setMetaFaturamento(parseFloat(editMetaFat) || 0); setMetaMRR(parseFloat(editMetaMrr) || 0); setMetasOpen(false); }
   }
 
+  async function buildChartData(allParcelas: any[], allRecorrencias: any[], allCustos: Custo[]) {
     const now = new Date();
     const mrrAtivo = allRecorrencias.filter((r: Recorrencia) => r.ativo).reduce((s: number, r: Recorrencia) => s + Number(r.valor_mensal), 0);
     const totalCustos = allCustos.filter(c => c.ativo && ((c as any).escopo === 'empresa' || !(c as any).escopo)).reduce((s, c) => s + Number(c.valor_mensal), 0);
