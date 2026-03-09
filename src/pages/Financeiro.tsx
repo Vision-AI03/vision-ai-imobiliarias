@@ -103,7 +103,14 @@ export default function Financeiro() {
   const [filtroCategoria, setFiltroCategoria] = useState("todos");
   const [filtroMetodo, setFiltroMetodo] = useState("todos");
 
-  useEffect(() => { fetchAll(); }, []);
+  // Metas
+  const [metaFaturamento, setMetaFaturamento] = useState(0);
+  const [metaMRR, setMetaMRR] = useState(0);
+  const [editMetaFat, setEditMetaFat] = useState("");
+  const [editMetaMrr, setEditMetaMrr] = useState("");
+  const [metasOpen, setMetasOpen] = useState(false);
+
+  useEffect(() => { fetchAll(); fetchMetas(); }, []);
 
   async function fetchAll() {
     setLoading(true);
