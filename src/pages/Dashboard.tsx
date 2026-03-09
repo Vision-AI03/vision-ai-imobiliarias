@@ -158,6 +158,7 @@ export default function Dashboard() {
 
     const receitaDev = (parcelasPagas || []).reduce((sum, p) => sum + Number(p.valor), 0);
     const receitaRecorrente = (recorrenciasRes.data || []).reduce((sum, r) => sum + Number(r.valor_mensal), 0);
+    setMrrAtual(receitaRecorrente);
     const faturamento = receitaDev + receitaRecorrente;
     const totalCustos = (custosRes.data || []).reduce((sum, c) => sum + Number(c.valor_mensal), 0);
     const margem = faturamento - totalCustos;
