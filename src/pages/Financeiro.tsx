@@ -677,16 +677,20 @@ function CustosSection({ custos, totalCusto, novoCustoOpen, setNovoCustoOpen, cu
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Categoria</Label>
-                  <Select value={custoCategoria} onValueChange={setCustoCategoria}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="vps">VPS</SelectItem>
-                      <SelectItem value="api">API</SelectItem>
-                      <SelectItem value="token">Token</SelectItem>
-                      <SelectItem value="ferramenta">Ferramenta</SelectItem>
-                      <SelectItem value="outro">Outro</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {isPessoal ? (
+                    <Input value={custoCategoria} onChange={(e: any) => setCustoCategoria(e.target.value)} placeholder="Ex: Aluguel, Internet, Luz" />
+                  ) : (
+                    <Select value={custoCategoria} onValueChange={setCustoCategoria}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="vps">VPS</SelectItem>
+                        <SelectItem value="api">API</SelectItem>
+                        <SelectItem value="token">Token</SelectItem>
+                        <SelectItem value="ferramenta">Ferramenta</SelectItem>
+                        <SelectItem value="outro">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Valor Mensal *</Label>
