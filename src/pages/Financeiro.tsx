@@ -164,6 +164,21 @@ export default function Financeiro() {
 
   async function toggleCusto(id: string, ativo: boolean) { await supabase.from("custos").update({ ativo }).eq("id", id); fetchAll(); }
 
+  async function handleExcluirCusto(id: string) {
+    const { error } = await supabase.from("custos").delete().eq("id", id);
+    if (error) { toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" }); }
+    else { toast({ title: "Custo excluído!" }); fetchAll(); }
+  }
+
+  async function handleEditarCusto(id: string, nome: string, categoria: string, valorMensal: string, renovacao: string) {
+    if (!nome || !valorMensal) { toast({ title: "Preencha nome e valor", variant: "destructive" }); return; }
+    const { error } = await supabase.from("custos").update({
+      nome: nome.trim(), categoria, valor_mensal: parseFloat(valorMensal), data_renovacao: renovacao || null,
+    }).eq("id", id);
+    if (error) { toast({ title: "Erro ao editar", description: error.message, variant: "destructive" }); }
+    else { toast({ title: "Custo atualizado!" }); fetchAll(); }
+  }
+
   async function handleSalvarTransacao() {
     if (!transDescricao || !transValor || !transCategoria) { toast({ title: "Preencha os campos obrigatórios", variant: "destructive" }); return; }
     setTransSaving(true);
