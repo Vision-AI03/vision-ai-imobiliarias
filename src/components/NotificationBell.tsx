@@ -53,8 +53,70 @@ export function NotificationBell() {
     }
   }, []);
 
+  // Client-side cleanup of stale notifications
+  const cleanStaleNotifications = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: allNotifs } = await supabase
+      .from("notificacoes")
+      .select("id, tipo, metadata")
+      .eq("user_id", user.id);
+
+    if (!allNotifs || allNotifs.length === 0) return;
+
+    const staleIds: string[] = [];
+
+    // Check leads
+    const leadNotifs = allNotifs.filter((n) => ["lead_parado", "novo_lead_webhook"].includes(n.tipo));
+    if (leadNotifs.length > 0) {
+      const leadIds = [...new Set(leadNotifs.map((n) => (n.metadata as Record<string, unknown>)?.lead_id as string).filter(Boolean))];
+      if (leadIds.length > 0) {
+        const { data: existing } = await supabase.from("leads").select("id").in("id", leadIds);
+        const set = new Set((existing || []).map((l) => l.id));
+        leadNotifs.forEach((n) => {
+          const lid = (n.metadata as Record<string, unknown>)?.lead_id as string;
+          if (lid && !set.has(lid)) staleIds.push(n.id);
+        });
+      }
+    }
+
+    // Check tarefas
+    const tarefaNotifs = allNotifs.filter((n) => n.tipo === "tarefa_atrasada");
+    if (tarefaNotifs.length > 0) {
+      const ids = [...new Set(tarefaNotifs.map((n) => (n.metadata as Record<string, unknown>)?.tarefa_id as string).filter(Boolean))];
+      if (ids.length > 0) {
+        const { data: existing } = await supabase.from("tarefas").select("id").in("id", ids);
+        const set = new Set((existing || []).map((t) => t.id));
+        tarefaNotifs.forEach((n) => {
+          const tid = (n.metadata as Record<string, unknown>)?.tarefa_id as string;
+          if (tid && !set.has(tid)) staleIds.push(n.id);
+        });
+      }
+    }
+
+    // Check contratos
+    const contratoNotifs = allNotifs.filter((n) => n.tipo === "contrato_pendente");
+    if (contratoNotifs.length > 0) {
+      const ids = [...new Set(contratoNotifs.map((n) => (n.metadata as Record<string, unknown>)?.contrato_id as string).filter(Boolean))];
+      if (ids.length > 0) {
+        const { data: existing } = await supabase.from("contratos").select("id").in("id", ids);
+        const set = new Set((existing || []).map((c) => c.id));
+        contratoNotifs.forEach((n) => {
+          const cid = (n.metadata as Record<string, unknown>)?.contrato_id as string;
+          if (cid && !set.has(cid)) staleIds.push(n.id);
+        });
+      }
+    }
+
+    if (staleIds.length > 0) {
+      await supabase.from("notificacoes").delete().in("id", staleIds);
+    }
+  }, []);
+
   useEffect(() => {
-    fetchNotificacoes();
+    // Clean stale notifications first, then fetch
+    cleanStaleNotifications().then(() => fetchNotificacoes());
 
     // Generate notifications on load
     supabase.functions.invoke("generate-notifications").catch(() => {});
@@ -81,7 +143,7 @@ export function NotificationBell() {
       clearTimeout(autoCloseTimer);
       supabase.removeChannel(channel);
     };
-  }, [fetchNotificacoes]);
+  }, [fetchNotificacoes, cleanStaleNotifications]);
 
   const markAsRead = async (id: string) => {
     await supabase
