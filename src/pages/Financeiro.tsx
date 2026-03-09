@@ -613,7 +613,8 @@ export default function Financeiro() {
               <CustosSection custos={custosPessoais} totalCusto={totalCustosPessoaisMes} novoCustoOpen={novoCustoOpen} setNovoCustoOpen={setNovoCustoOpen}
                 custoNome={custoNome} setCustoNome={setCustoNome} custoCategoria={custoCategoria} setCustoCategoria={setCustoCategoria}
                 custoValor={custoValor} setCustoValor={setCustoValor} custoRenovacao={custoRenovacao} setCustoRenovacao={setCustoRenovacao}
-                saving={saving} handleSalvarCusto={() => { setCustoEscopo("pessoal"); handleSalvarCusto(); }} toggleCusto={toggleCusto} />
+                saving={saving} handleSalvarCusto={() => { setCustoEscopo("pessoal"); handleSalvarCusto(); }} toggleCusto={toggleCusto}
+                handleExcluirCusto={handleExcluirCusto} handleEditarCusto={handleEditarCusto} />
             </TabsContent>
           </Tabs>
         </TabsContent>
