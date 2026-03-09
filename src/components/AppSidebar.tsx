@@ -1,5 +1,5 @@
 import { LayoutDashboard, Users, MessageSquare, FileText, DollarSign, LogOut, Settings, KeyRound, CheckSquare, DatabaseBackup, Webhook } from "lucide-react";
-import logoVision from "@/assets/logo_vision.jpg";
+import logoVision from "@/assets/logo_vision.png";
 import { NavLink } from "@/components/NavLink";
 import { supabase } from "@/integrations/supabase/client";
 import {
