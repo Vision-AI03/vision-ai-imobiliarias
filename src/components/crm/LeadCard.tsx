@@ -1,8 +1,9 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
-import { Mail, MailCheck, MessageSquare, CheckCheck } from "lucide-react";
+import { Mail, MailCheck, MessageSquare, CheckCheck, Globe, Smartphone, Hand } from "lucide-react";
 import { format } from "date-fns";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Lead = Tables<"leads">;
