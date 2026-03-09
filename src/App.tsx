@@ -16,6 +16,7 @@ import Financeiro from "./pages/Financeiro";
 import Credenciais from "./pages/Credenciais";
 import Tarefas from "./pages/Tarefas";
 import Backup from "./pages/Backup";
+import Notificacoes from "./pages/Notificacoes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -59,6 +60,7 @@ function AppRoutes() {
         <Route path="/tarefas" element={<Tarefas />} />
         <Route path="/configuracoes/credenciais" element={<Credenciais />} />
         <Route path="/configuracoes/backup" element={<Backup />} />
+        <Route path="/notificacoes" element={<Notificacoes />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
