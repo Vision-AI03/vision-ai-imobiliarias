@@ -1,5 +1,5 @@
 import { LayoutDashboard, Users, MessageSquare, FileText, DollarSign, LogOut, Settings, KeyRound, CheckSquare, DatabaseBackup, Webhook } from "lucide-react";
-import logoVision from "@/assets/logo_vision.png";
+import logoVision from "@/assets/logo_vision_transparent_transparent.png";
 import { NavLink } from "@/components/NavLink";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -35,7 +35,7 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="p-4 border-b border-border">
         <div className="flex items-center gap-2.5">
-          <img src={logoVision} alt="Vision AI" className="h-6 w-6 object-contain" />
+          <img src={logoVision} alt="Vision AI" className="h-7 w-7 object-contain" />
           <span className="text-lg font-bold gradient-primary-text">Vision AI</span>
         </div>
       </SidebarHeader>
