@@ -130,7 +130,28 @@ export default function Financeiro() {
     setLoading(false);
   }
 
-  async function buildChartData(allParcelas: any[], allRecorrencias: any[], allCustos: Custo[]) {
+  async function fetchMetas() {
+    const { data } = await supabase.from("metas_financeiras").select("*") as any;
+    if (data) {
+      const fat = data.find((m: any) => m.tipo === "faturamento_mes");
+      const mrr = data.find((m: any) => m.tipo === "mrr");
+      if (fat) { setMetaFaturamento(Number(fat.valor)); setEditMetaFat(String(fat.valor)); }
+      if (mrr) { setMetaMRR(Number(mrr.valor)); setEditMetaMrr(String(mrr.valor)); }
+    }
+  }
+
+  async function handleSalvarMetas() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { toast({ title: "Erro de autenticação", variant: "destructive" }); return; }
+    const upsertData = [
+      { user_id: user.id, tipo: "faturamento_mes", valor: parseFloat(editMetaFat) || 0 },
+      { user_id: user.id, tipo: "mrr", valor: parseFloat(editMetaMrr) || 0 },
+    ];
+    const { error } = await supabase.from("metas_financeiras").upsert(upsertData as any, { onConflict: "user_id,tipo" });
+    if (error) { toast({ title: "Erro ao salvar metas", description: error.message, variant: "destructive" }); }
+    else { toast({ title: "Metas atualizadas!" }); setMetaFaturamento(parseFloat(editMetaFat) || 0); setMetaMRR(parseFloat(editMetaMrr) || 0); setMetasOpen(false); }
+  }
+
     const now = new Date();
     const mrrAtivo = allRecorrencias.filter((r: Recorrencia) => r.ativo).reduce((s: number, r: Recorrencia) => s + Number(r.valor_mensal), 0);
     const totalCustos = allCustos.filter(c => c.ativo && ((c as any).escopo === 'empresa' || !(c as any).escopo)).reduce((s, c) => s + Number(c.valor_mensal), 0);
