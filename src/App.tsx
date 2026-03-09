@@ -58,6 +58,7 @@ function AppRoutes() {
         <Route path="/financeiro" element={<Financeiro />} />
         <Route path="/tarefas" element={<Tarefas />} />
         <Route path="/configuracoes/credenciais" element={<Credenciais />} />
+        <Route path="/configuracoes/backup" element={<Backup />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

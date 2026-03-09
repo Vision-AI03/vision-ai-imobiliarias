@@ -21,6 +21,7 @@ const items = [
   { title: "Financeiro", url: "/financeiro", icon: DollarSign },
   { title: "Tarefas", url: "/tarefas", icon: CheckSquare },
   { title: "Credenciais", url: "/configuracoes/credenciais", icon: KeyRound },
+  { title: "Backup", url: "/configuracoes/backup", icon: DatabaseBackup },
 ];
 
 export function AppSidebar() {
