@@ -16,6 +16,7 @@ import Financeiro from "./pages/Financeiro";
 import Credenciais from "./pages/Credenciais";
 import Tarefas from "./pages/Tarefas";
 import Backup from "./pages/Backup";
+import Notificacoes from "./pages/Notificacoes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
