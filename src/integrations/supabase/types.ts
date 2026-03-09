@@ -268,6 +268,7 @@ export type Database = {
           categoria: string
           criado_em: string
           data_renovacao: string | null
+          escopo: string | null
           id: string
           nome: string
           valor_mensal: number
@@ -277,6 +278,7 @@ export type Database = {
           categoria?: string
           criado_em?: string
           data_renovacao?: string | null
+          escopo?: string | null
           id?: string
           nome: string
           valor_mensal: number
@@ -286,6 +288,7 @@ export type Database = {
           categoria?: string
           criado_em?: string
           data_renovacao?: string | null
+          escopo?: string | null
           id?: string
           nome?: string
           valor_mensal?: number
@@ -699,6 +702,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      transacoes_pessoais: {
+        Row: {
+          categoria: string
+          comprovante_url: string | null
+          created_at: string | null
+          data: string
+          descricao: string
+          dia_recorrencia: number | null
+          id: string
+          metodo_pagamento: string | null
+          recorrente: boolean | null
+          tags: Json | null
+          tipo: string
+          updated_at: string | null
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          categoria: string
+          comprovante_url?: string | null
+          created_at?: string | null
+          data: string
+          descricao: string
+          dia_recorrencia?: number | null
+          id?: string
+          metodo_pagamento?: string | null
+          recorrente?: boolean | null
+          tags?: Json | null
+          tipo: string
+          updated_at?: string | null
+          user_id: string
+          valor: number
+        }
+        Update: {
+          categoria?: string
+          comprovante_url?: string | null
+          created_at?: string | null
+          data?: string
+          descricao?: string
+          dia_recorrencia?: number | null
+          id?: string
+          metodo_pagamento?: string | null
+          recorrente?: boolean | null
+          tags?: Json | null
+          tipo?: string
+          updated_at?: string | null
+          user_id?: string
+          valor?: number
+        }
+        Relationships: []
       }
     }
     Views: {
