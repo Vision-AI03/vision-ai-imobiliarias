@@ -29,8 +29,8 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md glass-card">
         <CardHeader className="text-center space-y-4 pb-2">
-          <div className="flex items-center justify-center gap-2">
-            <Zap className="h-8 w-8 text-primary" />
+          <div className="flex items-center justify-center gap-2.5">
+            <img src={logoVision} alt="Vision AI" className="h-9 w-9 rounded-lg object-cover mix-blend-lighten" />
             <h1 className="text-3xl font-bold gradient-primary-text">Vision AI</h1>
           </div>
           <p className="text-muted-foreground text-sm">Sistema de gestão interno</p>
