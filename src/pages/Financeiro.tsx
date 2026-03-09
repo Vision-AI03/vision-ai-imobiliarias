@@ -12,9 +12,10 @@ import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Progress } from "@/components/ui/progress";
 import {
   DollarSign, TrendingUp, TrendingDown, Plus, BarChart3, ArrowUpRight, ArrowDownRight,
-  Building2, User, CalendarIcon, Filter, Wallet, PieChart, Pencil, Trash2,
+  Building2, User, CalendarIcon, Filter, Wallet, PieChart, Pencil, Trash2, Target,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, subMonths, differenceInMonths } from "date-fns";
