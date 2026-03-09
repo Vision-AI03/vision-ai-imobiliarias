@@ -42,6 +42,7 @@ interface LeadDrawerProps {
   onClose: () => void;
   onStatusChange: (leadId: string, newStatus: string) => void;
   onLeadUpdate?: (lead: Lead) => void;
+  onLeadDelete?: (leadId: string) => void;
 }
 
 export default function LeadDrawer({ lead, open, onClose, onStatusChange, onLeadUpdate }: LeadDrawerProps) {
