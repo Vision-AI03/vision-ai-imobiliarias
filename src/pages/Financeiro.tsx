@@ -12,9 +12,10 @@ import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Progress } from "@/components/ui/progress";
 import {
   DollarSign, TrendingUp, TrendingDown, Plus, BarChart3, ArrowUpRight, ArrowDownRight,
-  Building2, User, CalendarIcon, Filter, Wallet, PieChart, Pencil, Trash2,
+  Building2, User, CalendarIcon, Filter, Wallet, PieChart, Pencil, Trash2, Target,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, subMonths, differenceInMonths } from "date-fns";
@@ -102,7 +103,14 @@ export default function Financeiro() {
   const [filtroCategoria, setFiltroCategoria] = useState("todos");
   const [filtroMetodo, setFiltroMetodo] = useState("todos");
 
-  useEffect(() => { fetchAll(); }, []);
+  // Metas
+  const [metaFaturamento, setMetaFaturamento] = useState(0);
+  const [metaMRR, setMetaMRR] = useState(0);
+  const [editMetaFat, setEditMetaFat] = useState("");
+  const [editMetaMrr, setEditMetaMrr] = useState("");
+  const [metasOpen, setMetasOpen] = useState(false);
+
+  useEffect(() => { fetchAll(); fetchMetas(); }, []);
 
   async function fetchAll() {
     setLoading(true);
@@ -120,6 +128,28 @@ export default function Financeiro() {
     setTransacoes((tRes.data as TransacaoPessoal[]) || []);
     await buildChartData(pRes.data || [], rRes.data || [], custRes.data || []);
     setLoading(false);
+  }
+
+  async function fetchMetas() {
+    const { data } = await supabase.from("metas_financeiras").select("*") as any;
+    if (data) {
+      const fat = data.find((m: any) => m.tipo === "faturamento_mes");
+      const mrr = data.find((m: any) => m.tipo === "mrr");
+      if (fat) { setMetaFaturamento(Number(fat.valor)); setEditMetaFat(String(fat.valor)); }
+      if (mrr) { setMetaMRR(Number(mrr.valor)); setEditMetaMrr(String(mrr.valor)); }
+    }
+  }
+
+  async function handleSalvarMetas() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { toast({ title: "Erro de autenticação", variant: "destructive" }); return; }
+    const upsertData = [
+      { user_id: user.id, tipo: "faturamento_mes", valor: parseFloat(editMetaFat) || 0 },
+      { user_id: user.id, tipo: "mrr", valor: parseFloat(editMetaMrr) || 0 },
+    ];
+    const { error } = await supabase.from("metas_financeiras").upsert(upsertData as any, { onConflict: "user_id,tipo" });
+    if (error) { toast({ title: "Erro ao salvar metas", description: error.message, variant: "destructive" }); }
+    else { toast({ title: "Metas atualizadas!" }); setMetaFaturamento(parseFloat(editMetaFat) || 0); setMetaMRR(parseFloat(editMetaMrr) || 0); setMetasOpen(false); }
   }
 
   async function buildChartData(allParcelas: any[], allRecorrencias: any[], allCustos: Custo[]) {
@@ -340,7 +370,74 @@ export default function Financeiro() {
             <SummaryCard icon={<TrendingUp className="h-5 w-5" />} title="MRR Atual" value={formatCurrency(mrrAtual)} subtitle={`${recorrencias.filter(r => r.ativo).length} contratos ativos`} accent="text-accent" />
           </div>
 
-          {/* NEW: LTV + Projeção */}
+          {/* Metas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="glass-card">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-2"><Target className="h-4 w-4 text-primary" />Meta de Faturamento</CardTitle>
+                <Dialog open={metasOpen} onOpenChange={setMetasOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs gap-1"><Pencil className="h-3 w-3" />Editar Metas</Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-sm bg-card border-border">
+                    <DialogHeader><DialogTitle>Definir Metas</DialogTitle></DialogHeader>
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Meta de Faturamento Mensal (R$)</Label>
+                        <Input type="number" value={editMetaFat} onChange={e => setEditMetaFat(e.target.value)} placeholder="50000" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Meta de MRR (R$)</Label>
+                        <Input type="number" value={editMetaMrr} onChange={e => setEditMetaMrr(e.target.value)} placeholder="20000" />
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setMetasOpen(false)}>Cancelar</Button>
+                        <Button onClick={handleSalvarMetas} className="gradient-primary text-primary-foreground">Salvar</Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                {metaFaturamento > 0 ? (
+                  <>
+                    <div className="flex items-end justify-between mb-2">
+                      <p className="text-2xl font-bold text-primary">{formatCurrency(receitaTotal)}</p>
+                      <p className="text-xs text-muted-foreground">de {formatCurrency(metaFaturamento)}</p>
+                    </div>
+                    <Progress value={Math.min((receitaTotal / metaFaturamento) * 100, 100)} className="h-3" />
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      {Math.round((receitaTotal / metaFaturamento) * 100)}% da meta — faltam {formatCurrency(Math.max(metaFaturamento - receitaTotal, 0))}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-2">Defina sua meta clicando em "Editar Metas"</p>
+                )}
+              </CardContent>
+            </Card>
+            <Card className="glass-card">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2"><Target className="h-4 w-4 text-accent" />Meta de MRR</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {metaMRR > 0 ? (
+                  <>
+                    <div className="flex items-end justify-between mb-2">
+                      <p className="text-2xl font-bold text-accent">{formatCurrency(mrrAtual)}</p>
+                      <p className="text-xs text-muted-foreground">de {formatCurrency(metaMRR)}</p>
+                    </div>
+                    <Progress value={Math.min((mrrAtual / metaMRR) * 100, 100)} className="h-3" />
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      {Math.round((mrrAtual / metaMRR) * 100)}% da meta — faltam {formatCurrency(Math.max(metaMRR - mrrAtual, 0))}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-2">Defina sua meta clicando em "Editar Metas"</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card className="glass-card">
               <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Wallet className="h-4 w-4 text-primary" />LTV Médio por Cliente</CardTitle></CardHeader>

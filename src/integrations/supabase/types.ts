@@ -564,6 +564,33 @@ export type Database = {
         }
         Relationships: []
       }
+      metas_financeiras: {
+        Row: {
+          created_at: string | null
+          id: string
+          tipo: string
+          updated_at: string | null
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          tipo: string
+          updated_at?: string | null
+          user_id: string
+          valor?: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          tipo?: string
+          updated_at?: string | null
+          user_id?: string
+          valor?: number
+        }
+        Relationships: []
+      }
       parcelas: {
         Row: {
           contrato_id: string
