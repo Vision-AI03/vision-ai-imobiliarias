@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, MessageSquare, FileText, DollarSign, LogOut, Settings, KeyRound, CheckSquare, DatabaseBackup, Webhook } from "lucide-react";
+import { LayoutDashboard, Users, MessageSquare, FileText, DollarSign, LogOut, KeyRound, CheckSquare, DatabaseBackup, Webhook, BarChart2 } from "lucide-react";
 import logoVision from "@/assets/logo_vision_transparent_transparent.png";
 import { NavLink } from "@/components/NavLink";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +21,7 @@ const items = [
   { title: "Contratos", url: "/contratos", icon: FileText },
   { title: "Financeiro", url: "/financeiro", icon: DollarSign },
   { title: "Tarefas", url: "/tarefas", icon: CheckSquare },
+  { title: "Relatórios", url: "/relatorios", icon: BarChart2 },
   { title: "Credenciais", url: "/configuracoes/credenciais", icon: KeyRound },
   { title: "Backup", url: "/configuracoes/backup", icon: DatabaseBackup },
   { title: "Integrações", url: "/configuracoes/integracoes", icon: Webhook },

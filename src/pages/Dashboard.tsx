@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Users, Calendar, Mail, MessageSquare, DollarSign, TrendingUp, CheckSquare, AlertTriangle, Clock,
-  Plus, FileText, Upload, Target,
+  Plus, FileText, Upload, Target, Bot, BarChart2, MessageCircle,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
@@ -102,11 +102,55 @@ export default function Dashboard() {
   const [metaFaturamento, setMetaFaturamento] = useState(0);
   const [metaMRR, setMetaMRR] = useState(0);
   const [mrrAtual, setMrrAtual] = useState(0);
+  const [wppStats, setWppStats] = useState({ recebidas: 0, enviadas: 0, leads_novos: 0 });
+  const [ultimoRelatorio, setUltimoRelatorio] = useState<{ semana_inicio: string; semana_fim: string; total_leads_abordados: number; taxa_conversao: number; taxa_resposta: number } | null>(null);
+  const [sugestoesIaPendentes, setSugestoesIaPendentes] = useState(0);
 
   useEffect(() => {
     fetchDashboardData();
     fetchMetas();
+    fetchAiStats();
   }, []);
+
+  async function fetchAiStats() {
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+
+    const [wppRes, relatorioRes, sugestoesRes] = await Promise.all([
+      supabase
+        .from("whatsapp_mensagens")
+        .select("direcao, lead_id")
+        .gte("created_at", todayStart),
+      supabase
+        .from("relatorios_semanais")
+        .select("semana_inicio, semana_fim, total_leads_abordados, taxa_conversao, metadata")
+        .order("semana_inicio", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("analise_lead_ia")
+        .select("id", { count: "exact", head: true })
+        .eq("aplicado", false),
+    ]);
+
+    const msgs = wppRes.data || [];
+    const recebidas = msgs.filter((m: any) => m.direcao === "recebida").length;
+    const enviadas = msgs.filter((m: any) => m.direcao === "enviada").length;
+    const leadsNovos = new Set(msgs.filter((m: any) => m.direcao === "recebida" && m.lead_id).map((m: any) => m.lead_id)).size;
+    setWppStats({ recebidas, enviadas, leads_novos: leadsNovos });
+
+    if (relatorioRes.data) {
+      setUltimoRelatorio({
+        semana_inicio: relatorioRes.data.semana_inicio,
+        semana_fim: relatorioRes.data.semana_fim,
+        total_leads_abordados: relatorioRes.data.total_leads_abordados || 0,
+        taxa_conversao: Number(relatorioRes.data.taxa_conversao || 0),
+        taxa_resposta: Number((relatorioRes.data.metadata as any)?.taxa_resposta || 0),
+      });
+    }
+
+    setSugestoesIaPendentes(sugestoesRes.count || 0);
+  }
 
   async function fetchMetas() {
     const { data } = await supabase.from("metas_financeiras").select("*") as any;
@@ -422,6 +466,96 @@ export default function Dashboard() {
                     <p className="text-sm font-semibold text-primary ml-2">{formatCurrency(c.valor_total)}</p>
                   </div>
                 ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* IA / WhatsApp Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* WhatsApp Hoje */}
+        <Card className="glass-card cursor-pointer hover:border-primary/30 transition-colors" onClick={() => navigate("/crm")}>
+          <CardHeader className="flex flex-row items-center gap-2 pb-2">
+            <MessageCircle className="h-4 w-4 text-green-500" />
+            <CardTitle className="text-sm">WhatsApp Hoje</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div>
+                <p className="text-xl font-bold text-green-500">{wppStats.recebidas}</p>
+                <p className="text-[10px] text-muted-foreground">Recebidas</p>
+              </div>
+              <div>
+                <p className="text-xl font-bold text-primary">{wppStats.enviadas}</p>
+                <p className="text-[10px] text-muted-foreground">Enviadas</p>
+              </div>
+              <div>
+                <p className="text-xl font-bold">{wppStats.leads_novos}</p>
+                <p className="text-[10px] text-muted-foreground">Leads ativos</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Último Relatório */}
+        <Card className="glass-card cursor-pointer hover:border-primary/30 transition-colors" onClick={() => navigate("/relatorios")}>
+          <CardHeader className="flex flex-row items-center gap-2 pb-2">
+            <BarChart2 className="h-4 w-4 text-accent" />
+            <CardTitle className="text-sm">Último Relatório</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {ultimoRelatorio ? (
+              <>
+                <p className="text-xs text-muted-foreground mb-2">
+                  {new Date(ultimoRelatorio.semana_inicio + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} —{" "}
+                  {new Date(ultimoRelatorio.semana_fim + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                </p>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <p className="text-xl font-bold">{ultimoRelatorio.total_leads_abordados}</p>
+                    <p className="text-[10px] text-muted-foreground">Abordados</p>
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-primary">{ultimoRelatorio.taxa_resposta}%</p>
+                    <p className="text-[10px] text-muted-foreground">Responderam</p>
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-accent">{ultimoRelatorio.taxa_conversao}%</p>
+                    <p className="text-[10px] text-muted-foreground">Conversão</p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-3">Nenhum relatório ainda</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Sugestões da IA */}
+        <Card className="glass-card cursor-pointer hover:border-primary/30 transition-colors" onClick={() => navigate("/crm")}>
+          <CardHeader className="flex flex-row items-center gap-2 pb-2">
+            <Bot className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm">Sugestões da IA</CardTitle>
+            {sugestoesIaPendentes > 0 && (
+              <Badge className="ml-auto text-[10px] bg-warning/20 text-warning border-warning/20">
+                {sugestoesIaPendentes} pendente{sugestoesIaPendentes > 1 ? "s" : ""}
+              </Badge>
+            )}
+          </CardHeader>
+          <CardContent>
+            {sugestoesIaPendentes === 0 ? (
+              <div className="text-center py-3">
+                <Bot className="h-8 w-8 text-muted-foreground/30 mx-auto mb-1" />
+                <p className="text-xs text-muted-foreground">Nenhuma sugestão pendente</p>
+              </div>
+            ) : (
+              <div className="text-center py-2">
+                <p className="text-3xl font-bold text-primary">{sugestoesIaPendentes}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  mudança{sugestoesIaPendentes > 1 ? "s" : ""} de estágio para revisar
+                </p>
+                <p className="text-xs text-primary mt-2">Abrir CRM →</p>
               </div>
             )}
           </CardContent>

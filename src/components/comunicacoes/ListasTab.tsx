@@ -13,6 +13,7 @@ import { Upload, FileSpreadsheet, Plus, Trash2, Eye, Loader2 } from "lucide-reac
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
+import mammoth from "mammoth";
 
 const NICHOS = [
   { value: "clinicas", label: "Clínicas" },
@@ -96,7 +97,32 @@ export function ListasTab({ listas, onRefresh }: Props) {
     const ext = file.name.split(".").pop()?.toLowerCase();
 
     try {
-      if (ext === "csv" || ext === "xlsx" || ext === "xls") {
+      if (ext === "docx" || ext === "doc") {
+        const buffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer: buffer });
+        const text = result.value;
+
+        // Extract emails with optional surrounding context for name
+        const emailRegex = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
+        const emails = [...new Set(text.match(emailRegex) || [])];
+
+        if (emails.length === 0) {
+          toast({ title: "Nenhum email encontrado no documento", variant: "destructive" });
+          setParsing(false);
+          return;
+        }
+
+        // Try to extract name from the line containing the email
+        const lines = text.split(/\r?\n/);
+        const contacts: ParsedContact[] = emails.map(email => {
+          const line = lines.find(l => l.includes(email)) || "";
+          const namePart = line.replace(email, "").replace(/[|;,\t]+/g, " ").trim();
+          return { email, nome: namePart || "" };
+        });
+
+        setParsedContacts(contacts);
+        toast({ title: `${contacts.length} emails encontrados no documento Word` });
+      } else if (ext === "csv" || ext === "xlsx" || ext === "xls") {
         const buffer = await file.arrayBuffer();
         const wb = XLSX.read(buffer, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
@@ -146,7 +172,7 @@ export function ListasTab({ listas, onRefresh }: Props) {
         setParsedContacts(contacts);
         toast({ title: `${contacts.length} contatos extraídos do PDF` });
       } else {
-        toast({ title: "Formato não suportado. Use .csv, .xlsx, .xls ou .pdf", variant: "destructive" });
+        toast({ title: "Formato não suportado. Use .csv, .xlsx, .xls, .docx, .doc ou .pdf", variant: "destructive" });
       }
     } catch (err: any) {
       toast({ title: "Erro ao processar arquivo", description: err.message, variant: "destructive" });
@@ -332,7 +358,7 @@ export function ListasTab({ listas, onRefresh }: Props) {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Arquivo (.csv, .xlsx, .xls, .pdf)</Label>
+              <Label>Arquivo (.csv, .xlsx, .xls, .docx, .doc, .pdf)</Label>
               <div
                 className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
                 onClick={() => fileInputRef.current?.click()}
@@ -340,7 +366,7 @@ export function ListasTab({ listas, onRefresh }: Props) {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv,.xlsx,.xls,.pdf"
+                  accept=".csv,.xlsx,.xls,.docx,.doc,.pdf"
                   className="hidden"
                   onChange={handleFileUpload}
                 />
@@ -359,7 +385,7 @@ export function ListasTab({ listas, onRefresh }: Props) {
                   <div>
                     <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                     <p className="text-sm text-muted-foreground">Clique para selecionar ou arraste um arquivo</p>
-                    <p className="text-xs text-muted-foreground mt-1">CSV, XLSX, XLS ou PDF</p>
+                    <p className="text-xs text-muted-foreground mt-1">CSV, XLSX, XLS, DOCX, DOC ou PDF</p>
                   </div>
                 )}
               </div>

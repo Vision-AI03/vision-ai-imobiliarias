@@ -18,6 +18,7 @@ import Integracoes from "./pages/Integracoes";
 import Tarefas from "./pages/Tarefas";
 import Backup from "./pages/Backup";
 import Notificacoes from "./pages/Notificacoes";
+import Relatorios from "./pages/Relatorios";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -63,6 +64,7 @@ function AppRoutes() {
         <Route path="/configuracoes/backup" element={<Backup />} />
         <Route path="/configuracoes/integracoes" element={<Integracoes />} />
         <Route path="/notificacoes" element={<Notificacoes />} />
+        <Route path="/relatorios" element={<Relatorios />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

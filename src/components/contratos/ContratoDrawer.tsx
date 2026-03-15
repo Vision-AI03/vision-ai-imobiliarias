@@ -10,7 +10,10 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Check, Clock, AlertTriangle, FileText, DollarSign, Pencil, Trash2, Save, X } from "lucide-react";
+import {
+  Check, Clock, AlertTriangle, FileText, DollarSign, Pencil, Trash2,
+  Save, X, MessageCircle, Mail, Loader2, ListChecks, RefreshCw,
+} from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -64,6 +67,8 @@ export default function ContratoDrawer({ contrato, open, onClose, onUpdate }: Co
   const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [generatingTasks, setGeneratingTasks] = useState(false);
+  const [cobrancaLoadingId, setCobrancaLoadingId] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Editable fields
@@ -102,9 +107,37 @@ export default function ContratoDrawer({ contrato, open, onClose, onUpdate }: Co
     setLoading(false);
   }
 
+  async function handleGenerateOnboardingTasks(contratoId: string) {
+    setGeneratingTasks(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const { data, error } = await supabase.functions.invoke("generate-onboarding-tasks", {
+        body: { contrato_id: contratoId, user_id: session?.user?.id },
+      });
+      if (error || data?.error) {
+        toast({
+          title: "Erro ao gerar tarefas",
+          description: error?.message || data?.error,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: `${data.count} tarefas de onboarding criadas!`,
+          description: "Visualize e edite em Tarefas.",
+        });
+      }
+    } catch (e) {
+      toast({ title: "Erro ao gerar tarefas de onboarding", variant: "destructive" });
+    }
+    setGeneratingTasks(false);
+  }
+
   async function handleSave() {
     if (!contrato) return;
     setSaving(true);
+
+    const previousStatus = contrato.status;
+
     const { error } = await supabase.from("contratos").update({
       cliente_nome: editNome.trim(),
       cliente_email: editEmail.trim() || null,
@@ -113,20 +146,39 @@ export default function ContratoDrawer({ contrato, open, onClose, onUpdate }: Co
       valor_total: parseFloat(editValorTotal) || 0,
       status: editStatus,
     }).eq("id", contrato.id);
+
     setSaving(false);
+
     if (error) {
       toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    const wasActivated = previousStatus !== "ativo" && editStatus === "ativo";
+
+    if (wasActivated) {
+      toast({ title: "Contrato ativado!" });
+
+      // Feature 1: Auto-activate recorrências
+      if (recorrencias.length > 0) {
+        await supabase.from("recorrencias").update({ ativo: true }).eq("contrato_id", contrato.id);
+        setRecorrencias(prev => prev.map(r => ({ ...r, ativo: true })));
+        toast({ title: "Recorrência ativada automaticamente no Financeiro!" });
+      }
+
+      // Feature 2: Generate onboarding tasks via AI
+      await handleGenerateOnboardingTasks(contrato.id);
     } else {
       toast({ title: "Contrato atualizado!" });
-      setEditing(false);
-      onUpdate();
     }
+
+    setEditing(false);
+    onUpdate();
   }
 
   async function handleDelete() {
     if (!contrato) return;
     setDeleting(true);
-    // Delete related records first
     await supabase.from("parcelas").delete().eq("contrato_id", contrato.id);
     await supabase.from("recorrencias").delete().eq("contrato_id", contrato.id);
     const { error } = await supabase.from("contratos").delete().eq("id", contrato.id);
@@ -149,6 +201,63 @@ export default function ContratoDrawer({ contrato, open, onClose, onUpdate }: Co
     toast({ title: "Pagamento confirmado!" });
     if (contrato) fetchDetails(contrato.id);
     onUpdate();
+  }
+
+  // Feature 3: One-click charge — WhatsApp first, email as fallback
+  async function handleCobrar(parcela: Parcela) {
+    if (!contrato) return;
+
+    const valor = formatCurrency(Number(parcela.valor));
+    const vencimento = format(new Date(parcela.data_vencimento + "T00:00:00"), "dd/MM/yyyy");
+    const mensagem = `Olá ${contrato.cliente_nome}! Passando para lembrar que há um pagamento de ${valor} com vencimento em ${vencimento} referente ao nosso contrato de serviços. Qualquer dúvida, estou à disposição!`;
+
+    // WhatsApp preferred
+    if (contrato.cliente_telefone) {
+      const phone = contrato.cliente_telefone.replace(/\D/g, "");
+      const waUrl = `https://wa.me/55${phone}?text=${encodeURIComponent(mensagem)}`;
+      window.open(waUrl, "_blank");
+      toast({ title: "WhatsApp aberto!", description: "Mensagem de cobrança pré-preenchida." });
+      return;
+    }
+
+    // Email fallback
+    if (contrato.cliente_email) {
+      setCobrancaLoadingId(parcela.id);
+      try {
+        const { error } = await supabase.functions.invoke("send-email", {
+          body: {
+            to: contrato.cliente_email,
+            subject: `Lembrete de Pagamento — ${valor}`,
+            html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+              <p>Olá <strong>${contrato.cliente_nome}</strong>,</p>
+              <p>Passamos para lembrar que há um pagamento em aberto:</p>
+              <table style="width:100%;border-collapse:collapse;margin:16px 0">
+                <tr><td style="padding:8px;background:#f5f5f5;border-radius:4px"><strong>Valor</strong></td><td style="padding:8px">${valor}</td></tr>
+                <tr><td style="padding:8px;background:#f5f5f5;border-radius:4px"><strong>Vencimento</strong></td><td style="padding:8px">${vencimento}</td></tr>
+                ${parcela.descricao ? `<tr><td style="padding:8px;background:#f5f5f5;border-radius:4px"><strong>Referente a</strong></td><td style="padding:8px">${parcela.descricao}</td></tr>` : ""}
+              </table>
+              <p>Qualquer dúvida, entre em contato conosco.</p>
+              <br><p style="color:#666;font-size:12px">Vision AI</p>
+            </div>`,
+          },
+        });
+        if (error) {
+          toast({ title: "Erro ao enviar email", description: error.message, variant: "destructive" });
+        } else {
+          toast({ title: "Cobrança enviada por email!", description: contrato.cliente_email });
+        }
+      } catch (e) {
+        toast({ title: "Erro ao enviar cobrança", variant: "destructive" });
+      }
+      setCobrancaLoadingId(null);
+      return;
+    }
+
+    toast({
+      title: "Sem contato cadastrado",
+      description: "Edite o contrato e adicione telefone ou email.",
+      variant: "destructive",
+    });
   }
 
   if (!contrato) return null;
@@ -185,13 +294,21 @@ export default function ContratoDrawer({ contrato, open, onClose, onUpdate }: Co
                           <X className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-success" onClick={handleSave} disabled={saving}>
-                          <Save className="h-4 w-4" />
+                          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                         </Button>
                       </>
                     )}
                   </div>
                 </div>
               </SheetHeader>
+
+              {/* Generating tasks indicator */}
+              {generatingTasks && (
+                <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-lg text-xs text-primary border border-primary/20">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin flex-shrink-0" />
+                  <span>IA gerando tarefas de onboarding com base no contrato...</span>
+                </div>
+              )}
 
               {/* Contract info */}
               <div className="space-y-2">
@@ -240,6 +357,12 @@ export default function ContratoDrawer({ contrato, open, onClose, onUpdate }: Co
                           <SelectItem value="encerrado">Encerrado</SelectItem>
                         </SelectContent>
                       </Select>
+                      {editStatus === "ativo" && contrato.status !== "ativo" && (
+                        <p className="text-[10px] text-primary flex items-center gap-1 mt-1">
+                          <ListChecks className="h-3 w-3" />
+                          Ao salvar: recorrência será ativada e tarefas de onboarding geradas pela IA.
+                        </p>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -277,7 +400,7 @@ export default function ContratoDrawer({ contrato, open, onClose, onUpdate }: Co
                   <p className="text-sm font-bold text-warning">{formatCurrency(totalPendente)}</p>
                 </div>
                 <div className="bg-primary/10 rounded-lg p-3 text-center">
-                  <FileText className="h-4 w-4 text-primary mx-auto mb-1" />
+                  <RefreshCw className="h-4 w-4 text-primary mx-auto mb-1" />
                   <p className="text-[10px] text-muted-foreground">MRR</p>
                   <p className="text-sm font-bold text-primary">{formatCurrency(mrrAtivo)}</p>
                 </div>
@@ -307,11 +430,37 @@ export default function ContratoDrawer({ contrato, open, onClose, onUpdate }: Co
                           </p>
                           {p.descricao && <p className="text-[10px] text-muted-foreground">{p.descricao}</p>}
                         </div>
-                        {p.status === "pendente" && (
-                          <Button size="sm" variant="outline" className="text-xs border-success/30 text-success hover:bg-success/10" onClick={() => confirmarPagamento(p.id)}>
-                            Confirmar
-                          </Button>
-                        )}
+                        <div className="flex gap-1">
+                          {p.status === "pendente" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs border-success/30 text-success hover:bg-success/10"
+                              onClick={() => confirmarPagamento(p.id)}
+                            >
+                              Confirmar
+                            </Button>
+                          )}
+                          {(p.status === "pendente" || p.status === "vencido") && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs"
+                              onClick={() => handleCobrar(p)}
+                              disabled={cobrancaLoadingId === p.id}
+                              title={contrato.cliente_telefone ? "Enviar cobrança via WhatsApp" : contrato.cliente_email ? "Enviar cobrança por email" : "Sem contato cadastrado"}
+                            >
+                              {cobrancaLoadingId === p.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : contrato.cliente_telefone ? (
+                                <MessageCircle className="h-3 w-3" />
+                              ) : (
+                                <Mail className="h-3 w-3" />
+                              )}
+                              <span className="ml-1">Cobrar</span>
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

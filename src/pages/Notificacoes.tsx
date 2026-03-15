@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bell, Check, DollarSign, Target, Mail, CheckSquare, Key, FileText, ChevronLeft, ChevronRight, Trash2, RefreshCw } from "lucide-react";
+import { Bell, Check, DollarSign, Target, Mail, CheckSquare, Key, FileText, ChevronLeft, ChevronRight, Trash2, RefreshCw, Bot, MessageCircle, BarChart2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +31,9 @@ const tipoIcons: Record<string, React.ReactNode> = {
   tarefa_atrasada: <CheckSquare className="h-4 w-4 text-destructive" />,
   contrato_pendente: <FileText className="h-4 w-4 text-blue-500" />,
   credencial_expirando: <Key className="h-4 w-4 text-yellow-500" />,
+  estagio_mudou_ia: <Bot className="h-4 w-4 text-primary" />,
+  sugestao_estagio_ia: <Bot className="h-4 w-4 text-yellow-500" />,
+  relatorio_semanal: <BarChart2 className="h-4 w-4 text-accent" />,
 };
 
 const tipoLabels: Record<string, string> = {
@@ -42,6 +45,9 @@ const tipoLabels: Record<string, string> = {
   tarefa_atrasada: "Tarefa Atrasada",
   contrato_pendente: "Contrato Pendente",
   credencial_expirando: "Credencial Expirando",
+  estagio_mudou_ia: "IA — Estágio Atualizado",
+  sugestao_estagio_ia: "IA — Sugestão Pendente",
+  relatorio_semanal: "Relatório Semanal",
 };
 
 const PAGE_SIZE = 20;

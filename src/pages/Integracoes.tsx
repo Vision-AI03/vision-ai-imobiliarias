@@ -8,11 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  Copy, Eye, EyeOff, RefreshCw, Globe, Smartphone, CheckCircle2,
-  XCircle, ExternalLink, Loader2, FlaskConical,
+  Copy, Eye, EyeOff, Globe, Smartphone, CheckCircle2,
+  XCircle, Loader2, FlaskConical, MessageCircle,
 } from "lucide-react";
 
 const PROJECT_REF = import.meta.env.VITE_SUPABASE_PROJECT_ID || "sfezwprbanvxsnwgvkhh";
+const WEBHOOK_WPP_URL = `https://${PROJECT_REF}.supabase.co/functions/v1/whatsapp-webhook`;
 const BASE_URL = `https://${PROJECT_REF}.supabase.co/functions/v1`;
 
 export default function Integracoes() {
@@ -32,9 +33,53 @@ export default function Integracoes() {
   const [testingMeta, setTestingMeta] = useState(false);
   const [metaTestResult, setMetaTestResult] = useState<null | boolean>(null);
 
+  // WhatsApp state
+  const [wppPhoneNumberId, setWppPhoneNumberId] = useState("");
+  const [wppWabaId, setWppWabaId] = useState("");
+  const [wppStatus, setWppStatus] = useState<"desconectado" | "conectado">("desconectado");
+  const [savingWpp, setSavingWpp] = useState(false);
+
   useEffect(() => {
     checkMetaConfig();
+    loadWppConfig();
   }, []);
+
+  const loadWppConfig = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase
+      .from("whatsapp_config")
+      .select("phone_number_id, waba_id, status")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (data) {
+      setWppPhoneNumberId(data.phone_number_id || "");
+      setWppWabaId(data.waba_id || "");
+      setWppStatus((data.status as any) || "desconectado");
+    }
+  };
+
+  const saveWppConfig = async () => {
+    setSavingWpp(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Não autenticado");
+      await supabase.from("whatsapp_config").upsert({
+        user_id: user.id,
+        phone_number_id: wppPhoneNumberId.trim(),
+        waba_id: wppWabaId.trim(),
+        webhook_url: WEBHOOK_WPP_URL,
+        status: wppPhoneNumberId.trim() ? "conectado" : "desconectado",
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id" });
+      setWppStatus(wppPhoneNumberId.trim() ? "conectado" : "desconectado");
+      toast({ title: "Configuração do WhatsApp salva!" });
+    } catch (err: any) {
+      toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingWpp(false);
+    }
+  };
 
   const checkMetaConfig = async () => {
     // Just check if secrets exist by trying a test call
@@ -264,6 +309,79 @@ export default function Integracoes() {
               metaTestResult
                 ? <span className="text-sm text-green-600 flex items-center gap-1"><CheckCircle2 className="h-4 w-4" /> Token válido</span>
                 : <span className="text-sm text-destructive flex items-center gap-1"><XCircle className="h-4 w-4" /> Token inválido</span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* WhatsApp Business */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <MessageCircle className="h-5 w-5 text-green-500" />
+            <CardTitle>WhatsApp Business (Monitoramento)</CardTitle>
+            <Badge
+              variant={wppStatus === "conectado" ? "default" : "outline"}
+              className={wppStatus === "conectado" ? "bg-green-500/20 text-green-600 border-green-500/30" : ""}
+            >
+              {wppStatus === "conectado" ? "Conectado" : "Não configurado"}
+            </Badge>
+          </div>
+          <CardDescription>Monitore conversas de WhatsApp e deixe a IA classificar automaticamente o estágio dos leads</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Phone Number ID</Label>
+              <Input
+                value={wppPhoneNumberId}
+                onChange={e => setWppPhoneNumberId(e.target.value)}
+                placeholder="Ex: 123456789012345"
+                className="font-mono text-xs"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>WhatsApp Business Account ID</Label>
+              <Input
+                value={wppWabaId}
+                onChange={e => setWppWabaId(e.target.value)}
+                placeholder="Ex: 987654321098765"
+                className="font-mono text-xs"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>URL do Webhook</Label>
+            <div className="flex gap-2">
+              <Input readOnly value={WEBHOOK_WPP_URL} className="font-mono text-xs" />
+              <Button size="icon" variant="outline" onClick={() => { navigator.clipboard.writeText(WEBHOOK_WPP_URL); toast({ title: "URL copiada!" }); }}>
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <Alert>
+            <AlertDescription className="text-xs space-y-1.5">
+              <p className="font-medium mb-1">Como configurar no Meta Developers:</p>
+              <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                <li>Acesse <strong>developers.facebook.com</strong> → seu app → WhatsApp → Configuration</li>
+                <li>Copie o <strong>Phone Number ID</strong> e o <strong>WABA ID</strong> acima</li>
+                <li>Em <strong>Webhook</strong>, cole a URL acima e o <strong>Verify Token</strong> configurado no secret <code>WHATSAPP_VERIFY_TOKEN</code></li>
+                <li>Inscreva-se no campo <strong>messages</strong></li>
+              </ol>
+            </AlertDescription>
+          </Alert>
+
+          <div className="flex items-center gap-3">
+            <Button onClick={saveWppConfig} disabled={savingWpp || !wppPhoneNumberId}>
+              {savingWpp ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Salvar Configuração
+            </Button>
+            {wppStatus === "conectado" && (
+              <span className="text-sm text-green-600 flex items-center gap-1">
+                <CheckCircle2 className="h-4 w-4" /> Webhook configurado
+              </span>
             )}
           </div>
         </CardContent>

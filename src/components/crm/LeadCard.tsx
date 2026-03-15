@@ -1,7 +1,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
-import { Mail, MailCheck, MessageSquare, CheckCheck, Globe, Smartphone, Hand } from "lucide-react";
+import { Mail, MailCheck, MessageSquare, CheckCheck, Globe, Smartphone, Hand, Bot } from "lucide-react";
 import { format } from "date-fns";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Tables } from "@/integrations/supabase/types";
@@ -70,6 +70,19 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
 
       {lead.empresa && (
         <p className="text-xs text-muted-foreground truncate">{lead.empresa}</p>
+      )}
+
+      {(lead as any).estagio_fonte === "ia_whatsapp" && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="inline-flex items-center gap-0.5">
+              <Badge className="text-[9px] px-1 py-0 bg-primary/15 text-primary border-primary/20 gap-0.5">
+                <Bot className="h-2.5 w-2.5" /> IA
+              </Badge>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">Estágio definido automaticamente pela IA</TooltipContent>
+        </Tooltip>
       )}
 
       <div className="flex items-center justify-between">

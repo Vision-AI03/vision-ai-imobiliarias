@@ -5,7 +5,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Mail, MailCheck, MessageSquare, CheckCheck, ExternalLink, Calendar, Building2, User, Globe, Linkedin, Sparkles, Loader2, Send, Trash2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Mail, MailCheck, MessageSquare, CheckCheck, ExternalLink, Calendar, Building2, User, Globe, Linkedin, Sparkles, Loader2, Send, Trash2, Bot } from "lucide-react";
+import { WhatsAppTab } from "@/components/crm/WhatsAppTab";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -22,10 +24,7 @@ const COLUNAS = [
   { value: "novo", label: "Novo" },
   { value: "enriquecido", label: "Enriquecido" },
   { value: "contatado", label: "Contatado" },
-  { value: "qualificado", label: "Qualificado" },
   { value: "reuniao_agendada", label: "Reunião Agendada" },
-  { value: "proposta_enviada", label: "Proposta Enviada" },
-  { value: "fechado", label: "Fechado" },
   { value: "perdido", label: "Perdido" },
 ];
 
@@ -359,25 +358,49 @@ export default function LeadDrawer({ lead, open, onClose, onStatusChange, onLead
             </div>
 
             <Separator />
-            <div className="space-y-2">
-              <h4 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Timeline de Interações</h4>
-              {comunicacoes.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Nenhuma interação registrada.</p>
-              ) : (
-                <div className="space-y-2">
-                  {comunicacoes.map(c => (
-                    <div key={c.id} className="bg-secondary/30 rounded p-2 text-xs space-y-1">
-                      <div className="flex items-center justify-between">
-                        <Badge variant="outline" className="text-[10px]">{c.tipo} — {c.direcao}</Badge>
-                        <span className="text-muted-foreground">{format(new Date(c.criado_em), "dd/MM HH:mm")}</span>
+
+            {/* Interactions + WhatsApp tabs */}
+            <Tabs defaultValue="timeline" className="w-full">
+              <TabsList className="w-full bg-secondary/50 h-8">
+                <TabsTrigger value="timeline" className="flex-1 text-xs h-7">
+                  <Mail className="h-3 w-3 mr-1" /> Timeline
+                </TabsTrigger>
+                <TabsTrigger value="whatsapp" className="flex-1 text-xs h-7">
+                  <MessageSquare className="h-3 w-3 mr-1" /> WhatsApp
+                  {(lead as any).total_mensagens_whatsapp > 0 && (
+                    <Badge className="ml-1 text-[9px] h-4 px-1 bg-primary/20 text-primary">
+                      {(lead as any).total_mensagens_whatsapp}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="timeline" className="mt-3">
+                {comunicacoes.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Nenhuma interação registrada.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {comunicacoes.map(c => (
+                      <div key={c.id} className="bg-secondary/30 rounded p-2 text-xs space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Badge variant="outline" className="text-[10px]">{c.tipo} — {c.direcao}</Badge>
+                          <span className="text-muted-foreground">{format(new Date(c.criado_em), "dd/MM HH:mm")}</span>
+                        </div>
+                        {c.assunto && <p className="font-medium">{c.assunto}</p>}
+                        {c.conteudo && <p className="text-muted-foreground line-clamp-2">{c.conteudo}</p>}
                       </div>
-                      {c.assunto && <p className="font-medium">{c.assunto}</p>}
-                      {c.conteudo && <p className="text-muted-foreground line-clamp-2">{c.conteudo}</p>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="whatsapp" className="mt-3">
+                <WhatsAppTab
+                  leadId={lead.id}
+                  estagioFonte={(lead as any).estagio_fonte}
+                />
+              </TabsContent>
+            </Tabs>
 
             <Separator />
 

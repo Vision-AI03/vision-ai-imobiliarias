@@ -171,7 +171,7 @@ export default function Contratos() {
     if (parcelasInsert.length > 0) await supabase.from("parcelas").insert(parcelasInsert);
     const recorrencia = parseFloat(valorRecorrencia);
     if (recorrencia > 0) {
-      await supabase.from("recorrencias").insert({ contrato_id: contrato.id, valor_mensal: recorrencia, dia_vencimento: parseInt(diaVencimento) || 10, ativo: true });
+      await supabase.from("recorrencias").insert({ contrato_id: contrato.id, valor_mensal: recorrencia, dia_vencimento: parseInt(diaVencimento) || 10, ativo: false });
     }
     toast({ title: "Contrato criado com sucesso!" });
     setNovoOpen(false);
