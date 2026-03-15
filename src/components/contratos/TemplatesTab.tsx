@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,108 +21,226 @@ import { Plus, FileText, Pencil, Trash2, FileCode } from "lucide-react";
 import { format } from "date-fns";
 
 const TIPOS_TEMPLATE = [
-  { value: "venda_sistema", label: "Venda de Sistema" },
-  { value: "assinatura_agentes", label: "Assinatura + Setup de Agentes IA" },
-  { value: "consultoria", label: "Consultoria" },
+  { value: "compra_venda", label: "Compra e Venda" },
+  { value: "locacao_residencial", label: "Locação Residencial" },
+  { value: "locacao_comercial", label: "Locação Comercial" },
+  { value: "proposta_compra", label: "Proposta de Compra" },
+  { value: "autorizacao_venda", label: "Autorização de Venda" },
+  { value: "autorizacao_locacao", label: "Autorização de Locação" },
+  { value: "recibo_sinal", label: "Recibo de Sinal / Arras" },
   { value: "outro", label: "Outro" },
+];
+
+const PLACEHOLDERS_PADRAO = [
+  "nome_vendedor", "cpf_vendedor", "rg_vendedor",
+  "nome_comprador", "cpf_comprador", "rg_comprador",
+  "endereco_imovel", "matricula_imovel", "cartorio_registro",
+  "valor_total", "valor_sinal", "valor_financiado",
+  "prazo_entrega", "data_assinatura",
+  "nome_imobiliaria", "cnpj_imobiliaria", "creci_imobiliaria",
+  "nome_corretor", "creci_corretor",
+  "percentual_comissao", "valor_comissao",
+  "clausulas_especiais",
 ];
 
 const DEFAULT_TEMPLATES = [
   {
-    nome: "Contrato de Venda de Sistema",
-    tipo: "venda_sistema",
-    conteudo_template: `CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE DESENVOLVIMENTO DE SISTEMA
+    nome: "Contrato de Compra e Venda",
+    tipo: "compra_venda",
+    conteudo_template: `CONTRATO PARTICULAR DE PROMESSA DE COMPRA E VENDA DE IMÓVEL
 
-CONTRATANTE: {{nome_cliente}}
-CNPJ/CPF: {{cnpj}}
-Endereço: {{endereco}}
-Email: {{email_cliente}}
-Telefone: {{telefone_cliente}}
+VENDEDOR(A): {{nome_vendedor}}
+CPF/CNPJ: {{cpf_vendedor}}
+RG: {{rg_vendedor}}
 
-CONTRATADA: Vision AI Tecnologia LTDA
+COMPRADOR(A): {{nome_comprador}}
+CPF/CNPJ: {{cpf_comprador}}
+RG: {{rg_comprador}}
 
-1. OBJETO
-A CONTRATADA se compromete a desenvolver e entregar o seguinte sistema:
-{{descricao_servico}}
+IMOBILIÁRIA: {{nome_imobiliaria}}
+CNPJ: {{cnpj_imobiliaria}}
+CRECI: {{creci_imobiliaria}}
+CORRETOR RESPONSÁVEL: {{nome_corretor}} — CRECI: {{creci_corretor}}
 
-2. VALOR E PAGAMENTO
-Valor total: {{valor_total}}
-Forma de pagamento: {{parcelas}}
-{{detalhes_pagamento}}
+CLÁUSULA 1ª — DO OBJETO
+O VENDEDOR é legítimo proprietário do imóvel situado em {{endereco_imovel}}, com matrícula nº {{matricula_imovel}} no {{cartorio_registro}}.
 
-3. PRAZO
-Data de início: {{data_inicio}}
-Prazo de entrega: {{prazo_entrega}}
+CLÁUSULA 2ª — DO PREÇO E FORMA DE PAGAMENTO
+O preço total da compra e venda é de {{valor_total}}, a ser pago da seguinte forma:
+— Sinal/Arras: {{valor_sinal}}, pago neste ato;
+— Financiamento: {{valor_financiado}};
+— Demais condições: {{condicoes_pagamento}}.
 
-4. GARANTIA E SUPORTE
-A CONTRATADA oferece garantia de {{prazo_garantia}} meses após a entrega, incluindo correção de bugs e ajustes menores.
+CLÁUSULA 3ª — DA ENTREGA
+A entrega das chaves e a lavratura da escritura definitiva ocorrerão até {{prazo_entrega}}.
 
-5. PROPRIEDADE INTELECTUAL
-O código-fonte e a propriedade intelectual do sistema serão transferidos ao CONTRATANTE após a quitação total do contrato.
+CLÁUSULA 4ª — DA COMISSÃO DE CORRETAGEM
+A comissão de corretagem é de {{percentual_comissao}}% sobre o valor total, correspondendo a {{valor_comissao}}, devida à {{nome_imobiliaria}}.
 
-6. RESCISÃO
-Em caso de rescisão antecipada por qualquer das partes, deverá haver comunicação prévia de 30 dias, sendo devidos os valores proporcionais aos serviços já realizados.
-
-{{clausulas_adicionais}}
+CLÁUSULA 5ª — DAS DISPOSIÇÕES ESPECIAIS
+{{clausulas_especiais}}
 
 Local e data: _____________, {{data_assinatura}}
 
-___________________________
-CONTRATANTE: {{nome_cliente}}
+_________________________________
+VENDEDOR(A): {{nome_vendedor}}
 
-___________________________
-CONTRATADA: Vision AI Tecnologia LTDA`,
-    placeholders: ["nome_cliente", "cnpj", "endereco", "email_cliente", "telefone_cliente", "descricao_servico", "valor_total", "parcelas", "detalhes_pagamento", "data_inicio", "prazo_entrega", "prazo_garantia", "clausulas_adicionais", "data_assinatura"],
+_________________________________
+COMPRADOR(A): {{nome_comprador}}
+
+_________________________________
+IMOBILIÁRIA: {{nome_imobiliaria}}`,
+    placeholders: PLACEHOLDERS_PADRAO,
   },
   {
-    nome: "Contrato de Assinatura + Setup de Agentes IA",
-    tipo: "assinatura_agentes",
-    conteudo_template: `CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE IA COM ASSINATURA MENSAL
+    nome: "Contrato de Locação Residencial",
+    tipo: "locacao_residencial",
+    conteudo_template: `CONTRATO DE LOCAÇÃO RESIDENCIAL
 
-CONTRATANTE: {{nome_cliente}}
-CNPJ/CPF: {{cnpj}}
-Endereço: {{endereco}}
-Email: {{email_cliente}}
-Telefone: {{telefone_cliente}}
+LOCADOR(A): {{nome_vendedor}}
+CPF/CNPJ: {{cpf_vendedor}}
 
-CONTRATADA: Vision AI Tecnologia LTDA
+LOCATÁRIO(A): {{nome_comprador}}
+CPF/CNPJ: {{cpf_comprador}}
+RG: {{rg_comprador}}
 
-1. OBJETO
-A CONTRATADA se compromete a configurar e manter agentes de inteligência artificial para o CONTRATANTE, incluindo:
-{{descricao_servico}}
+IMOBILIÁRIA ADMINISTRADORA: {{nome_imobiliaria}}
+CRECI: {{creci_imobiliaria}}
+CORRETOR: {{nome_corretor}} — CRECI: {{creci_corretor}}
 
-2. VALOR DO SETUP (IMPLANTAÇÃO)
-Valor do setup: {{valor_setup}}
-Forma de pagamento do setup: {{parcelas_setup}}
+CLÁUSULA 1ª — DO IMÓVEL
+O LOCADOR cede ao LOCATÁRIO, para uso exclusivamente residencial, o imóvel situado em {{endereco_imovel}}, matrícula nº {{matricula_imovel}}.
 
-3. ASSINATURA MENSAL
-Valor mensal: {{valor_mensal}}
-Dia de vencimento: {{dia_vencimento}}
-O pagamento mensal inclui: manutenção dos agentes, atualizações, suporte técnico e monitoramento.
+CLÁUSULA 2ª — DO PRAZO
+O prazo de locação é de {{prazo_locacao}} meses, iniciando-se em {{data_inicio}} e encerrando-se em {{data_termino}}.
 
-4. VIGÊNCIA
-Data de início: {{data_inicio}}
-Prazo mínimo de contrato: {{prazo_minimo}} meses
-Após o prazo mínimo, o contrato renova automaticamente por períodos iguais, podendo ser cancelado com aviso prévio de 30 dias.
+CLÁUSULA 3ª — DO ALUGUEL
+O aluguel mensal é de {{valor_total}}, a ser pago até o dia {{dia_vencimento}} de cada mês.
 
-5. SLA (ACORDO DE NÍVEL DE SERVIÇO)
-- Disponibilidade: 99,5% uptime
-- Tempo de resposta para suporte: até 4 horas úteis
-- Correção de bugs críticos: até 24 horas
+CLÁUSULA 4ª — DA GARANTIA LOCATÍCIA
+{{tipo_garantia}}: {{dados_garantia}}.
 
-6. RESCISÃO
-Em caso de rescisão antes do prazo mínimo, o CONTRATANTE deverá pagar multa de {{multa_rescisao}}% do valor restante do prazo mínimo.
+CLÁUSULA 5ª — DA COMISSÃO
+A taxa de administração é de {{percentual_comissao}}% sobre o aluguel mensal, devida à {{nome_imobiliaria}}.
 
-{{clausulas_adicionais}}
+CLÁUSULA 6ª — DISPOSIÇÕES ESPECIAIS
+{{clausulas_especiais}}
 
 Local e data: _____________, {{data_assinatura}}
 
-___________________________
-CONTRATANTE: {{nome_cliente}}
+_________________________________
+LOCADOR(A): {{nome_vendedor}}
 
-___________________________
-CONTRATADA: Vision AI Tecnologia LTDA`,
-    placeholders: ["nome_cliente", "cnpj", "endereco", "email_cliente", "telefone_cliente", "descricao_servico", "valor_setup", "parcelas_setup", "valor_mensal", "dia_vencimento", "data_inicio", "prazo_minimo", "multa_rescisao", "clausulas_adicionais", "data_assinatura"],
+_________________________________
+LOCATÁRIO(A): {{nome_comprador}}
+
+_________________________________
+IMOBILIÁRIA: {{nome_imobiliaria}}`,
+    placeholders: [...PLACEHOLDERS_PADRAO, "prazo_locacao", "data_inicio", "data_termino", "dia_vencimento", "tipo_garantia", "dados_garantia"],
+  },
+  {
+    nome: "Proposta de Compra",
+    tipo: "proposta_compra",
+    conteudo_template: `PROPOSTA DE COMPRA DE IMÓVEL
+
+DATA: {{data_assinatura}}
+
+PROPONENTE COMPRADOR(A): {{nome_comprador}}
+CPF: {{cpf_comprador}}
+Telefone: {{telefone_comprador}}
+
+IMÓVEL PRETENDIDO: {{endereco_imovel}}
+Matrícula: {{matricula_imovel}}
+
+VALOR PROPOSTO: {{valor_total}}
+FORMA DE PAGAMENTO:
+— Entrada/Sinal: {{valor_sinal}}
+— Financiamento: {{valor_financiado}}
+— Condições: {{condicoes_pagamento}}
+
+PRAZO DE VALIDADE DESTA PROPOSTA: {{prazo_validade}} dias.
+
+PRAZO PARA ASSINATURA DO CONTRATO DEFINITIVO: {{prazo_entrega}}.
+
+CORRETOR RESPONSÁVEL: {{nome_corretor}} — CRECI: {{creci_corretor}}
+IMOBILIÁRIA: {{nome_imobiliaria}} — CRECI: {{creci_imobiliaria}}
+COMISSÃO: {{percentual_comissao}}% — {{valor_comissao}}
+
+CONDIÇÕES ESPECIAIS:
+{{clausulas_especiais}}
+
+_________________________________
+PROPONENTE: {{nome_comprador}}`,
+    placeholders: [...PLACEHOLDERS_PADRAO, "telefone_comprador", "prazo_validade", "condicoes_pagamento"],
+  },
+  {
+    nome: "Autorização de Venda (Captação)",
+    tipo: "autorizacao_venda",
+    conteudo_template: `AUTORIZAÇÃO DE VENDA DE IMÓVEL
+
+PROPRIETÁRIO(A): {{nome_vendedor}}
+CPF/CNPJ: {{cpf_vendedor}}
+Telefone: {{telefone_proprietario}}
+
+IMÓVEL: {{endereco_imovel}}
+Matrícula: {{matricula_imovel}} — {{cartorio_registro}}
+
+Por meio deste instrumento, o PROPRIETÁRIO autoriza a {{nome_imobiliaria}} (CRECI: {{creci_imobiliaria}}) a intermediar a VENDA do referido imóvel pelo preço de {{valor_total}}, pelo prazo de {{prazo_autorizacao}} dias.
+
+COMISSÃO DE CORRETAGEM: {{percentual_comissao}}% sobre o valor de venda, a ser paga pelo vendedor na data da assinatura do contrato.
+
+CORRETOR RESPONSÁVEL: {{nome_corretor}} — CRECI: {{creci_corretor}}
+
+EXCLUSIVIDADE: {{exclusividade}}
+
+{{clausulas_especiais}}
+
+Local e data: _____________, {{data_assinatura}}
+
+_________________________________
+PROPRIETÁRIO(A): {{nome_vendedor}}
+
+_________________________________
+IMOBILIÁRIA: {{nome_imobiliaria}}`,
+    placeholders: [...PLACEHOLDERS_PADRAO, "telefone_proprietario", "prazo_autorizacao", "exclusividade"],
+  },
+  {
+    nome: "Recibo de Sinal / Arras",
+    tipo: "recibo_sinal",
+    conteudo_template: `RECIBO DE SINAL E PRINCÍPIO DE PAGAMENTO (ARRAS)
+
+PAGADOR(A): {{nome_comprador}}
+CPF: {{cpf_comprador}}
+
+RECEBEDOR(A): {{nome_vendedor}}
+CPF: {{cpf_vendedor}}
+
+IMÓVEL: {{endereco_imovel}}
+Matrícula: {{matricula_imovel}}
+
+RECEBI a quantia de {{valor_sinal}}, a título de sinal e princípio de pagamento pela compra do imóvel acima descrito, pelo preço total de {{valor_total}}.
+
+O valor do sinal será DEDUZIDO do preço total na assinatura do contrato definitivo.
+
+Em caso de desistência:
+— Por parte do COMPRADOR: perde o valor do sinal em favor do VENDEDOR;
+— Por parte do VENDEDOR: devolve o sinal em DOBRO ao COMPRADOR.
+
+Prazo para assinatura do contrato definitivo: {{prazo_entrega}}.
+
+CORRETOR: {{nome_corretor}} — CRECI: {{creci_corretor}}
+IMOBILIÁRIA: {{nome_imobiliaria}}
+
+{{clausulas_especiais}}
+
+Local e data: _____________, {{data_assinatura}}
+
+_________________________________
+VENDEDOR(A): {{nome_vendedor}}
+
+_________________________________
+COMPRADOR(A): {{nome_comprador}}`,
+    placeholders: PLACEHOLDERS_PADRAO,
   },
 ];
 
@@ -147,11 +265,11 @@ export default function TemplatesTab({ templates, onRefresh }: TemplatesTabProps
   const [editId, setEditId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [nome, setNome] = useState("");
-  const [tipo, setTipo] = useState("venda_sistema");
+  const [tipo, setTipo] = useState("compra_venda");
   const [conteudo, setConteudo] = useState("");
 
   function resetForm() {
-    setNome(""); setTipo("venda_sistema"); setConteudo(""); setEditId(null);
+    setNome(""); setTipo("compra_venda"); setConteudo(""); setEditId(null);
   }
 
   function openEdit(t: Template) {
@@ -174,7 +292,7 @@ export default function TemplatesTab({ templates, onRefresh }: TemplatesTabProps
         placeholders: t.placeholders,
       } as any);
     }
-    toast({ title: "Templates padrão criados!" });
+    toast({ title: `${DEFAULT_TEMPLATES.length} templates imobiliários criados!` });
     onRefresh();
   }
 
@@ -186,7 +304,6 @@ export default function TemplatesTab({ templates, onRefresh }: TemplatesTabProps
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Extract placeholders from content
     const matches = conteudo.match(/\{\{(\w+)\}\}/g) || [];
     const placeholders = [...new Set(matches.map(m => m.replace(/\{\{|\}\}/g, "")))];
 
@@ -228,7 +345,6 @@ export default function TemplatesTab({ templates, onRefresh }: TemplatesTabProps
     setDeleteId(null);
   }
 
-  // Highlight placeholders in content preview
   function highlightPlaceholders(text: string) {
     return text.replace(/\{\{(\w+)\}\}/g, '<span class="text-primary font-semibold">{{$1}}</span>');
   }
@@ -236,11 +352,11 @@ export default function TemplatesTab({ templates, onRefresh }: TemplatesTabProps
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <p className="text-sm text-muted-foreground">Modelos base para gerar contratos com IA.</p>
+        <p className="text-sm text-muted-foreground">Templates para geração de contratos imobiliários com IA.</p>
         <div className="flex gap-2">
           {templates.length === 0 && (
             <Button variant="outline" onClick={seedDefaults}>
-              <FileCode className="h-4 w-4 mr-2" />Criar Templates Padrão
+              <FileCode className="h-4 w-4 mr-2" />Criar Templates Imobiliários Padrão
             </Button>
           )}
           <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
@@ -252,6 +368,15 @@ export default function TemplatesTab({ templates, onRefresh }: TemplatesTabProps
                 <DialogTitle>{editId ? "Editar Template" : "Novo Template"}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Placeholders padrão disponíveis:{" "}
+                    {PLACEHOLDERS_PADRAO.slice(0, 6).map(p => (
+                      <code key={p} className="text-primary text-xs mx-0.5">{`{{${p}}}`}</code>
+                    ))}
+                    {" "}e mais...
+                  </p>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Nome *</Label>
@@ -273,7 +398,7 @@ export default function TemplatesTab({ templates, onRefresh }: TemplatesTabProps
                   <Textarea
                     value={conteudo}
                     onChange={e => setConteudo(e.target.value)}
-                    placeholder="CONTRATO DE PRESTAÇÃO DE SERVIÇOS..."
+                    placeholder="CONTRATO DE COMPRA E VENDA..."
                     rows={20}
                     className="font-mono text-sm"
                   />
@@ -293,7 +418,7 @@ export default function TemplatesTab({ templates, onRefresh }: TemplatesTabProps
           <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <FileText className="h-12 w-12 mb-4 opacity-40" />
             <p>Nenhum template cadastrado.</p>
-            <p className="text-xs mt-1">Clique em "Criar Templates Padrão" para começar com 2 modelos prontos.</p>
+            <p className="text-xs mt-1">Clique em "Criar Templates Imobiliários Padrão" para começar com {DEFAULT_TEMPLATES.length} modelos prontos.</p>
           </CardContent>
         </Card>
       ) : (

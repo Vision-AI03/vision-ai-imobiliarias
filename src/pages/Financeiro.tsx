@@ -356,7 +356,8 @@ export default function Financeiro() {
 
       <Tabs defaultValue="empresa" className="space-y-6">
         <TabsList className="bg-secondary/50">
-          <TabsTrigger value="empresa" className="gap-1.5"><Building2 className="h-4 w-4" />Vision AI</TabsTrigger>
+          <TabsTrigger value="empresa" className="gap-1.5"><Building2 className="h-4 w-4" />Imobiliária</TabsTrigger>
+          <TabsTrigger value="comissoes" className="gap-1.5"><DollarSign className="h-4 w-4" />Comissões</TabsTrigger>
           <TabsTrigger value="pessoal" className="gap-1.5"><User className="h-4 w-4" />Pessoal</TabsTrigger>
         </TabsList>
 
@@ -592,6 +593,11 @@ export default function Financeiro() {
                 handleExcluirCusto={handleExcluirCusto} handleEditarCusto={handleEditarCusto} />
             </TabsContent>
           </Tabs>
+        </TabsContent>
+
+        {/* ============= COMISSÕES TAB ============= */}
+        <TabsContent value="comissoes">
+          <ComissoesTab />
         </TabsContent>
 
         {/* ============= PESSOAL TAB ============= */}
@@ -896,5 +902,330 @@ function CustosSection({ custos, totalCusto, novoCustoOpen, setNovoCustoOpen, cu
         </div>
       )}
     </>
+  );
+}
+
+// ==================== ABA DE COMISSÕES ====================
+function ComissoesTab() {
+  const { toast } = useToast();
+  const [comissoes, setComissoes] = useState<any[]>([]);
+  const [corretores, setCorretores] = useState<any[]>([]);
+  const [imoveis, setImoveis] = useState<any[]>([]);
+  const [leads, setLeads] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [filtroCorretor, setFiltroCorretor] = useState("");
+  const [filtroStatus, setFiltroStatus] = useState("");
+  const [form, setForm] = useState({
+    lead_id: "", imovel_id: "", corretor_id: "", tipo: "venda",
+    valor_imovel: "", percentual_comissao: "6", valor_comissao: "",
+    status: "a_receber", data_prevista: "", data_recebimento: "", observacoes: "",
+  });
+
+  useEffect(() => {
+    fetchAll();
+  }, []);
+
+  async function fetchAll() {
+    setLoading(true);
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) return;
+
+    const [c, cor, imov, lds] = await Promise.all([
+      supabase.from("comissoes").select("*, corretor:corretores(nome), imovel:imoveis(titulo, tipo, endereco), lead:leads(nome)").eq("user_id", userData.user.id).order("created_at", { ascending: false }),
+      supabase.from("corretores").select("id, nome").eq("admin_id", userData.user.id).eq("ativo", true).order("nome"),
+      supabase.from("imoveis").select("id, titulo, tipo, endereco").eq("user_id", userData.user.id).order("created_at", { ascending: false }).limit(100),
+      supabase.from("leads").select("id, nome").order("nome").limit(200),
+    ]);
+
+    setComissoes(c.data || []);
+    setCorretores(cor.data || []);
+    setImoveis(imov.data || []);
+    setLeads(lds.data || []);
+    setLoading(false);
+  }
+
+  function calcComissao(valor: string, pct: string) {
+    const v = parseFloat(valor) || 0;
+    const p = parseFloat(pct) || 0;
+    return ((v * p) / 100).toFixed(2);
+  }
+
+  async function handleSave() {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) return;
+
+    const payload = {
+      user_id: userData.user.id,
+      lead_id: form.lead_id || null,
+      imovel_id: form.imovel_id || null,
+      corretor_id: form.corretor_id || null,
+      tipo: form.tipo,
+      valor_imovel: form.valor_imovel ? parseFloat(form.valor_imovel) : null,
+      percentual_comissao: parseFloat(form.percentual_comissao) || null,
+      valor_comissao: form.valor_comissao ? parseFloat(form.valor_comissao) : null,
+      status: form.status,
+      data_prevista: form.data_prevista || null,
+      data_recebimento: form.data_recebimento || null,
+      observacoes: form.observacoes || null,
+    };
+
+    let error;
+    if (editId) {
+      ({ error } = await supabase.from("comissoes").update(payload).eq("id", editId));
+    } else {
+      ({ error } = await supabase.from("comissoes").insert(payload));
+    }
+
+    if (error) {
+      toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: editId ? "Comissão atualizada!" : "Comissão cadastrada!" });
+      setDialogOpen(false);
+      setEditId(null);
+      fetchAll();
+    }
+  }
+
+  const filtered = comissoes.filter(c => {
+    if (filtroCorretor && c.corretor_id !== filtroCorretor) return false;
+    if (filtroStatus && c.status !== filtroStatus) return false;
+    return true;
+  });
+
+  const totalAReceber = filtered.filter(c => c.status === "a_receber").reduce((a, c) => a + (c.valor_comissao || 0), 0);
+  const totalRecebida = filtered.filter(c => c.status === "recebida").reduce((a, c) => a + (c.valor_comissao || 0), 0);
+
+  // Ranking por corretor
+  const rankingCorretor: Record<string, number> = {};
+  comissoes.filter(c => c.status === "recebida").forEach(c => {
+    const nome = c.corretor?.nome || "Sem corretor";
+    rankingCorretor[nome] = (rankingCorretor[nome] || 0) + (c.valor_comissao || 0);
+  });
+  const rankingData = Object.entries(rankingCorretor)
+    .map(([nome, valor]) => ({ nome, valor }))
+    .sort((a, b) => b.valor - a.valor)
+    .slice(0, 10);
+
+  if (loading) return <div className="flex items-center justify-center py-12"><div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
+
+  return (
+    <div className="space-y-5">
+      {/* Resumo */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">A Receber</p>
+          <p className="text-xl font-bold text-yellow-600">{formatCurrency(totalAReceber)}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">Recebidas</p>
+          <p className="text-xl font-bold text-emerald-500">{formatCurrency(totalRecebida)}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">Total</p>
+          <p className="text-xl font-bold">{formatCurrency(totalAReceber + totalRecebida)}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">Registros</p>
+          <p className="text-xl font-bold">{filtered.length}</p>
+        </CardContent></Card>
+      </div>
+
+      {/* Gráfico ranking */}
+      {rankingData.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Ranking de Comissões por Corretor (recebidas)</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={rankingData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" className="opacity-20" />
+                <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
+                <YAxis type="category" dataKey="nome" tick={{ fontSize: 11 }} width={90} />
+                <Tooltip formatter={(v: any) => [formatCurrency(v), "Comissão"]} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
+                <Bar dataKey="valor" fill="hsl(var(--primary))" radius={[0, 3, 3, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Filtros + botão */}
+      <div className="flex flex-wrap gap-2 items-center justify-between">
+        <div className="flex gap-2 flex-wrap">
+          <Select value={filtroCorretor} onValueChange={setFiltroCorretor}>
+            <SelectTrigger className="w-44 h-8 text-xs"><SelectValue placeholder="Filtrar corretor" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Todos corretores</SelectItem>
+              {corretores.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+            <SelectTrigger className="w-36 h-8 text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Todos</SelectItem>
+              <SelectItem value="a_receber">A Receber</SelectItem>
+              <SelectItem value="recebida">Recebida</SelectItem>
+              <SelectItem value="cancelada">Cancelada</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <Button size="sm" onClick={() => { setEditId(null); setForm({ lead_id: "", imovel_id: "", corretor_id: "", tipo: "venda", valor_imovel: "", percentual_comissao: "6", valor_comissao: "", status: "a_receber", data_prevista: "", data_recebimento: "", observacoes: "" }); setDialogOpen(true); }}>
+          <Plus className="h-4 w-4 mr-1" />Nova Comissão
+        </Button>
+      </div>
+
+      {/* Tabela */}
+      <Card>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-xs">
+              <tr>
+                <th className="text-left px-4 py-3">Imóvel / Lead</th>
+                <th className="text-left px-4 py-3">Corretor</th>
+                <th className="text-left px-4 py-3">Tipo</th>
+                <th className="text-right px-4 py-3">Valor Imóvel</th>
+                <th className="text-right px-4 py-3">% / Comissão</th>
+                <th className="text-left px-4 py-3">Status</th>
+                <th className="text-left px-4 py-3">Previsão</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr><td colSpan={8} className="text-center py-8 text-muted-foreground text-sm">Nenhuma comissão cadastrada.</td></tr>
+              ) : filtered.map(c => (
+                <tr key={c.id} className="border-t hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-xs">{c.imovel?.titulo || c.imovel?.tipo || "—"}</p>
+                    {c.lead?.nome && <p className="text-[10px] text-muted-foreground">{c.lead.nome}</p>}
+                  </td>
+                  <td className="px-4 py-3 text-xs">{c.corretor?.nome || "—"}</td>
+                  <td className="px-4 py-3 text-xs capitalize">{c.tipo}</td>
+                  <td className="px-4 py-3 text-right text-xs">{c.valor_imovel ? formatCurrency(c.valor_imovel) : "—"}</td>
+                  <td className="px-4 py-3 text-right">
+                    <span className="text-xs">{c.percentual_comissao}%</span>
+                    <span className="block text-xs font-semibold text-primary">{c.valor_comissao ? formatCurrency(c.valor_comissao) : "—"}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge variant="outline" className={`text-[10px] ${c.status === "recebida" ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" : c.status === "a_receber" ? "bg-yellow-500/15 text-yellow-600 border-yellow-500/30" : "bg-muted"}`}>
+                      {c.status.replace("_", " ")}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{c.data_prevista ? format(new Date(c.data_prevista), "dd/MM/yyyy") : "—"}</td>
+                  <td className="px-4 py-3">
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      setEditId(c.id);
+                      setForm({ lead_id: c.lead_id || "", imovel_id: c.imovel_id || "", corretor_id: c.corretor_id || "", tipo: c.tipo, valor_imovel: c.valor_imovel?.toString() || "", percentual_comissao: c.percentual_comissao?.toString() || "6", valor_comissao: c.valor_comissao?.toString() || "", status: c.status, data_prevista: c.data_prevista || "", data_recebimento: c.data_recebimento || "", observacoes: c.observacoes || "" });
+                      setDialogOpen(true);
+                    }}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Dialog comissão */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>{editId ? "Editar Comissão" : "Nova Comissão"}</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Tipo</Label>
+                <Select value={form.tipo} onValueChange={v => setForm(f => ({ ...f, tipo: v }))}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="venda">Venda</SelectItem>
+                    <SelectItem value="aluguel">Aluguel</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Status</Label>
+                <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="a_receber">A Receber</SelectItem>
+                    <SelectItem value="recebida">Recebida</SelectItem>
+                    <SelectItem value="cancelada">Cancelada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Imóvel</Label>
+              <Select value={form.imovel_id} onValueChange={v => setForm(f => ({ ...f, imovel_id: v }))}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sem imóvel</SelectItem>
+                  {imoveis.map(i => <SelectItem key={i.id} value={i.id}>{i.titulo || i.tipo} — {i.endereco || "Sem endereço"}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Lead / Cliente</Label>
+              <Select value={form.lead_id} onValueChange={v => setForm(f => ({ ...f, lead_id: v }))}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sem lead</SelectItem>
+                  {leads.map(l => <SelectItem key={l.id} value={l.id}>{l.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Corretor</Label>
+              <Select value={form.corretor_id} onValueChange={v => setForm(f => ({ ...f, corretor_id: v }))}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sem corretor</SelectItem>
+                  {corretores.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1 col-span-2">
+                <Label className="text-xs">Valor do Imóvel (R$)</Label>
+                <Input type="number" value={form.valor_imovel} onChange={e => {
+                  const v = e.target.value;
+                  const comissao = calcComissao(v, form.percentual_comissao);
+                  setForm(f => ({ ...f, valor_imovel: v, valor_comissao: comissao }));
+                }} className="h-8 text-xs" placeholder="500000" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">% Comissão</Label>
+                <Input type="number" value={form.percentual_comissao} onChange={e => {
+                  const p = e.target.value;
+                  const comissao = calcComissao(form.valor_imovel, p);
+                  setForm(f => ({ ...f, percentual_comissao: p, valor_comissao: comissao }));
+                }} className="h-8 text-xs" placeholder="6" step="0.1" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Valor da Comissão (R$) — calculado automaticamente</Label>
+              <Input type="number" value={form.valor_comissao} onChange={e => setForm(f => ({ ...f, valor_comissao: e.target.value }))} className="h-8 text-xs font-semibold text-primary" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Data Prevista</Label>
+                <Input type="date" value={form.data_prevista} onChange={e => setForm(f => ({ ...f, data_prevista: e.target.value }))} className="h-8 text-xs" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Data Recebimento</Label>
+                <Input type="date" value={form.data_recebimento} onChange={e => setForm(f => ({ ...f, data_recebimento: e.target.value }))} className="h-8 text-xs" />
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button size="sm" onClick={handleSave}>{editId ? "Salvar" : "Cadastrar"}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

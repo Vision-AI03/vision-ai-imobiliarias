@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session } from "@supabase/supabase-js";
 import { AppLayout } from "@/components/AppLayout";
@@ -20,6 +20,13 @@ import Backup from "./pages/Backup";
 import Notificacoes from "./pages/Notificacoes";
 import Relatorios from "./pages/Relatorios";
 import NotFound from "./pages/NotFound";
+// Novos módulos imobiliários
+import Imoveis from "./pages/Imoveis";
+import Agenda from "./pages/Agenda";
+import Corretores from "./pages/Corretores";
+import Aparencia from "./pages/Aparencia";
+import Portais from "./pages/Portais";
+import HotsiteCorretor from "./pages/HotsiteCorretor";
 
 const queryClient = new QueryClient();
 
@@ -47,24 +54,36 @@ function AppRoutes() {
     );
   }
 
-  if (!session) {
-    return <Auth />;
-  }
+  // DEV: login desativado temporariamente para testes
+  // if (!session) {
+  //   return <Auth />;
+  // }
 
   return (
     <Routes>
+      {/* Rotas públicas — sem autenticação */}
+      <Route path="/c/:slug" element={<HotsiteCorretor />} />
+
       <Route element={<AppLayout />}>
+        {/* Core */}
         <Route path="/" element={<Dashboard />} />
         <Route path="/crm" element={<CRM />} />
         <Route path="/comunicacoes" element={<Comunicacoes />} />
         <Route path="/contratos" element={<Contratos />} />
         <Route path="/financeiro" element={<Financeiro />} />
         <Route path="/tarefas" element={<Tarefas />} />
+        <Route path="/relatorios" element={<Relatorios />} />
+        <Route path="/notificacoes" element={<Notificacoes />} />
+        {/* Imobiliários novos */}
+        <Route path="/imoveis" element={<Imoveis />} />
+        <Route path="/agenda" element={<Agenda />} />
+        <Route path="/corretores" element={<Corretores />} />
+        {/* Configurações */}
         <Route path="/configuracoes/credenciais" element={<Credenciais />} />
         <Route path="/configuracoes/backup" element={<Backup />} />
         <Route path="/configuracoes/integracoes" element={<Integracoes />} />
-        <Route path="/notificacoes" element={<Notificacoes />} />
-        <Route path="/relatorios" element={<Relatorios />} />
+        <Route path="/configuracoes/aparencia" element={<Aparencia />} />
+        <Route path="/configuracoes/portais" element={<Portais />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

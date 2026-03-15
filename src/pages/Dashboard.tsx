@@ -4,645 +4,507 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Users, Calendar, Mail, MessageSquare, DollarSign, TrendingUp, CheckSquare, AlertTriangle, Clock,
-  Plus, FileText, Upload, Target, Bot, BarChart2, MessageCircle,
+  Users, Calendar, DollarSign, TrendingUp, CheckSquare, AlertTriangle,
+  Clock, Plus, FileText, Home, BarChart2, ArrowRight, User, MapPin,
 } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, Legend,
 } from "recharts";
-import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek, isWithinInterval, addDays } from "date-fns";
+import {
+  format, startOfMonth, endOfMonth, subMonths, startOfWeek, addDays,
+} from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 
-interface KpiData {
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(value);
+}
+
+interface KpiImob {
   leadsDoMes: number;
-  reunioesAgendadas: number;
-  taxaRespostaEmail: number;
-  taxaRespostaWhatsapp: number;
-  faturamentoMes: number;
-  margemLiquida: number;
-  custosMes: number;
+  visitasAgendadasSemana: number;
+  visitasRealizadasMes: number;
+  propostasEnviadasMes: number;
+  vgvFechadoMes: number;
+  comissaoEstimada: number;
+  txLeadVisita: number;
+  txVisitaProposta: number;
+  txPropostaFechamento: number;
+  imoveisDisponiveis: number;
+  leadsSemContato4h: number;
+}
+
+interface VisitaHoje {
+  id: string;
+  hora_visita: string;
+  lead_nome: string;
+  imovel_endereco: string;
+  status: string;
 }
 
 interface LeadRecente {
   id: string;
   nome: string;
-  empresa: string | null;
-  score: number | null;
-  status: string | null;
-  criado_em: string | null;
-}
-
-interface PagamentoProximo {
-  id: string;
-  cliente_nome: string;
-  valor: number;
-  data_vencimento: string;
   status: string;
-}
-
-interface WeeklyLeads {
-  semana: string;
-  leads: number;
-}
-
-interface MonthlyRevenue {
-  mes: string;
-  desenvolvimento: number;
-  recorrente: number;
+  origem_portal: string | null;
+  criado_em: string;
 }
 
 interface TarefaHoje {
   id: string;
   titulo: string;
   prioridade: string;
-  data_vencimento: string | null;
-  status: string;
   concluida: boolean;
-  tipo: "atrasada" | "hoje" | "proxima";
 }
 
-interface ContratoPendente {
-  id: string;
-  cliente_nome: string;
-  status: string;
-  valor_total: number;
-  criado_em: string;
-}
-
-function getScoreColor(score: number | null) {
-  if (!score) return "bg-muted text-muted-foreground";
-  if (score >= 71) return "bg-success/20 text-success";
-  if (score >= 41) return "bg-warning/20 text-warning";
-  return "bg-destructive/20 text-destructive";
-}
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-}
+const ORIGEM_ICONS: Record<string, string> = {
+  zap: "🏠",
+  vivareal: "🏠",
+  olx: "🏠",
+  meta: "📱",
+  whatsapp: "💬",
+  site: "🌐",
+  indicacao: "👤",
+  manual: "✋",
+};
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [kpis, setKpis] = useState<KpiData>({
-    leadsDoMes: 0, reunioesAgendadas: 0, taxaRespostaEmail: 0,
-    taxaRespostaWhatsapp: 0, faturamentoMes: 0, margemLiquida: 0, custosMes: 0,
+  const [kpis, setKpis] = useState<KpiImob>({
+    leadsDoMes: 0, visitasAgendadasSemana: 0, visitasRealizadasMes: 0,
+    propostasEnviadasMes: 0, vgvFechadoMes: 0, comissaoEstimada: 0,
+    txLeadVisita: 0, txVisitaProposta: 0, txPropostaFechamento: 0,
+    imoveisDisponiveis: 0, leadsSemContato4h: 0,
   });
+  const [visitasHoje, setVisitasHoje] = useState<VisitaHoje[]>([]);
   const [leadsRecentes, setLeadsRecentes] = useState<LeadRecente[]>([]);
-  const [pagamentosProximos, setPagamentosProximos] = useState<PagamentoProximo[]>([]);
   const [tarefasHoje, setTarefasHoje] = useState<TarefaHoje[]>([]);
-  const [contratosPendentes, setContratosPendentes] = useState<ContratoPendente[]>([]);
-  const [emailStats, setEmailStats] = useState({ fila: 0, enviados: 0, abertos: 0, taxaAbertura: 0 });
-  const [weeklyLeadsData, setWeeklyLeadsData] = useState<WeeklyLeads[]>([]);
-  const [monthlyRevenueData, setMonthlyRevenueData] = useState<MonthlyRevenue[]>([]);
+  const [weeklyLeadsData, setWeeklyLeadsData] = useState<{ semana: string; leads: number }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [metaFaturamento, setMetaFaturamento] = useState(0);
-  const [metaMRR, setMetaMRR] = useState(0);
-  const [mrrAtual, setMrrAtual] = useState(0);
-  const [wppStats, setWppStats] = useState({ recebidas: 0, enviadas: 0, leads_novos: 0 });
-  const [ultimoRelatorio, setUltimoRelatorio] = useState<{ semana_inicio: string; semana_fim: string; total_leads_abordados: number; taxa_conversao: number; taxa_resposta: number } | null>(null);
-  const [sugestoesIaPendentes, setSugestoesIaPendentes] = useState(0);
 
   useEffect(() => {
-    fetchDashboardData();
-    fetchMetas();
-    fetchAiStats();
+    fetchDashboard();
   }, []);
 
-  async function fetchAiStats() {
-    const today = new Date();
-    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
-
-    const [wppRes, relatorioRes, sugestoesRes] = await Promise.all([
-      supabase
-        .from("whatsapp_mensagens")
-        .select("direcao, lead_id")
-        .gte("created_at", todayStart),
-      supabase
-        .from("relatorios_semanais")
-        .select("semana_inicio, semana_fim, total_leads_abordados, taxa_conversao, metadata")
-        .order("semana_inicio", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("analise_lead_ia")
-        .select("id", { count: "exact", head: true })
-        .eq("aplicado", false),
-    ]);
-
-    const msgs = wppRes.data || [];
-    const recebidas = msgs.filter((m: any) => m.direcao === "recebida").length;
-    const enviadas = msgs.filter((m: any) => m.direcao === "enviada").length;
-    const leadsNovos = new Set(msgs.filter((m: any) => m.direcao === "recebida" && m.lead_id).map((m: any) => m.lead_id)).size;
-    setWppStats({ recebidas, enviadas, leads_novos: leadsNovos });
-
-    if (relatorioRes.data) {
-      setUltimoRelatorio({
-        semana_inicio: relatorioRes.data.semana_inicio,
-        semana_fim: relatorioRes.data.semana_fim,
-        total_leads_abordados: relatorioRes.data.total_leads_abordados || 0,
-        taxa_conversao: Number(relatorioRes.data.taxa_conversao || 0),
-        taxa_resposta: Number((relatorioRes.data.metadata as any)?.taxa_resposta || 0),
-      });
-    }
-
-    setSugestoesIaPendentes(sugestoesRes.count || 0);
-  }
-
-  async function fetchMetas() {
-    const { data } = await supabase.from("metas_financeiras").select("*") as any;
-    if (data) {
-      const fat = data.find((m: any) => m.tipo === "faturamento_mes");
-      const mrr = data.find((m: any) => m.tipo === "mrr");
-      if (fat) setMetaFaturamento(Number(fat.valor));
-      if (mrr) setMetaMRR(Number(mrr.valor));
-    }
-  }
-
-  async function fetchDashboardData() {
+  async function fetchDashboard() {
     setLoading(true);
     const now = new Date();
     const today = format(now, "yyyy-MM-dd");
-    const mesAtualInicio = startOfMonth(now).toISOString();
-    const mesAtualFim = endOfMonth(now).toISOString();
+    const mesInicio = startOfMonth(now).toISOString();
+    const mesFim = endOfMonth(now).toISOString();
+    const semanaInicio = startOfWeek(now, { weekStartsOn: 0 });
+    const semanaFim = addDays(semanaInicio, 6);
+    const h4agoIso = new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString();
 
     const [
-      leadsRes, leadsRecentesRes, parcelasRes, recorrenciasRes, custosRes, allLeadsRes, tarefasRes,
-      contratosRes, emailContatosRes,
+      leadsRes,
+      visitasSemanRes,
+      visitasMesRes,
+      imoveisRes,
+      visitasHojeRes,
+      leadsRecentesRes,
+      tarefasRes,
     ] = await Promise.all([
-      supabase.from("leads").select("*").gte("criado_em", mesAtualInicio).lte("criado_em", mesAtualFim),
-      supabase.from("leads").select("id, nome, empresa, score, status, criado_em").order("criado_em", { ascending: false }).limit(5),
-      supabase.from("parcelas").select("id, valor, data_vencimento, status, contrato_id, contratos(cliente_nome)").gte("data_vencimento", today).lte("data_vencimento", format(addDays(now, 7), "yyyy-MM-dd")).eq("status", "pendente").order("data_vencimento", { ascending: true }).limit(10),
-      supabase.from("recorrencias").select("valor_mensal").eq("ativo", true),
-      supabase.from("custos").select("valor_mensal").eq("ativo", true),
-      supabase.from("leads").select("criado_em").gte("criado_em", subDays(now, 30).toISOString()),
-      supabase.from("tarefas").select("id, titulo, prioridade, data_vencimento, status, concluida").eq("concluida", false).lte("data_vencimento", today).order("prioridade", { ascending: true }).order("data_vencimento", { ascending: true }).limit(5),
-      supabase.from("contratos").select("id, cliente_nome, status, valor_total, criado_em").in("status", ["pendente_assinatura", "rascunho", "enviado"]).order("criado_em", { ascending: false }).limit(5),
-      supabase.from("email_contatos").select("status_envio, enviado_em, aberto_em").gte("created_at", mesAtualInicio),
+      supabase.from("leads").select("id, status, criado_em, atualizado_em").gte("criado_em", mesInicio).lte("criado_em", mesFim),
+      supabase.from("agenda_visitas").select("id, status").gte("data_visita", format(semanaInicio, "yyyy-MM-dd")).lte("data_visita", format(semanaFim, "yyyy-MM-dd")).in("status", ["agendada", "confirmada"]),
+      supabase.from("agenda_visitas").select("id, status").gte("data_visita", format(startOfMonth(now), "yyyy-MM-dd")).lte("data_visita", format(endOfMonth(now), "yyyy-MM-dd")).eq("status", "realizada"),
+      supabase.from("imoveis").select("id, valor_venda, valor_aluguel").eq("status", "disponivel"),
+      supabase.from("agenda_visitas").select("id, hora_visita, status, lead:leads(nome), imovel:imoveis(endereco, bairro)").eq("data_visita", today).order("hora_visita"),
+      supabase.from("leads").select("id, nome, status, origem_portal, criado_em").order("criado_em", { ascending: false }).limit(6),
+      supabase.from("tarefas").select("id, titulo, prioridade, concluida").eq("concluida", false).or(`data_vencimento.lte.${today},data_vencimento.is.null`).order("prioridade").limit(5),
     ]);
 
-    // KPIs
-    const leadsMes = leadsRes.data || [];
-    const totalLeads = leadsMes.length;
-    const reunioes = leadsMes.filter(l => l.reuniao_agendada).length;
-    const emailEnviados = leadsMes.filter(l => l.email_enviado).length;
-    const emailRespondidos = leadsMes.filter(l => l.email_respondido).length;
-    const taxaEmail = emailEnviados > 0 ? Math.round((emailRespondidos / emailEnviados) * 100) : 0;
-    const whatsEnviados = leadsMes.filter(l => l.whatsapp_enviado).length;
-    const whatsRespondidos = leadsMes.filter(l => l.whatsapp_respondido).length;
-    const taxaWhatsapp = whatsEnviados > 0 ? Math.round((whatsRespondidos / whatsEnviados) * 100) : 0;
+    const leads = leadsRes.data || [];
+    const totalLeads = leads.length;
+    const visitasAgendadasSemana = visitasSemanRes.data?.length || 0;
+    const visitasRealizadasMes = visitasMesRes.data?.length || 0;
+    const propostasEnviadas = leads.filter(l => l.status === "proposta_enviada" || l.status === "negociando" || l.status === "contrato_assinado").length;
+    const contratosAssinados = leads.filter(l => l.status === "contrato_assinado");
 
-    const { data: parcelasPagas } = await supabase
-      .from("parcelas").select("valor").eq("status", "pago")
-      .gte("data_pagamento", format(startOfMonth(now), "yyyy-MM-dd"))
-      .lte("data_pagamento", format(endOfMonth(now), "yyyy-MM-dd"));
+    // VGV estimado (leads contrato_assinado × ticket médio dos imóveis disponíveis)
+    const imoveis = imoveisRes.data || [];
+    const ticketMedio = imoveis.length > 0
+      ? imoveis.reduce((acc, i) => acc + (i.valor_venda || i.valor_aluguel || 0), 0) / imoveis.length
+      : 0;
+    const vgvFechado = contratosAssinados.length * ticketMedio;
+    const comissaoEstimada = vgvFechado * 0.05; // 5% estimado
 
-    const receitaDev = (parcelasPagas || []).reduce((sum, p) => sum + Number(p.valor), 0);
-    const receitaRecorrente = (recorrenciasRes.data || []).reduce((sum, r) => sum + Number(r.valor_mensal), 0);
-    setMrrAtual(receitaRecorrente);
-    const faturamento = receitaDev + receitaRecorrente;
-    const totalCustos = (custosRes.data || []).reduce((sum, c) => sum + Number(c.valor_mensal), 0);
-    const margem = faturamento - totalCustos;
+    // Taxas de conversão
+    const visitasTotal = visitasRealizadasMes;
+    const txLeadVisita = totalLeads > 0 ? Math.round((visitasTotal / totalLeads) * 100) : 0;
+    const txVisitaProposta = visitasTotal > 0 ? Math.round((propostasEnviadas / visitasTotal) * 100) : 0;
+    const txPropostaFechamento = propostasEnviadas > 0 ? Math.round((contratosAssinados.length / propostasEnviadas) * 100) : 0;
+
+    // Leads sem contato há 4h (leads no estágio novo_lead atualizados há mais de 4h)
+    const leadsSemContato = leads.filter(l => l.status === "novo_lead" && l.atualizado_em && l.atualizado_em < h4agoIso).length;
 
     setKpis({
-      leadsDoMes: totalLeads, reunioesAgendadas: reunioes, taxaRespostaEmail: taxaEmail,
-      taxaRespostaWhatsapp: taxaWhatsapp, faturamentoMes: faturamento, margemLiquida: margem, custosMes: totalCustos,
+      leadsDoMes: totalLeads,
+      visitasAgendadasSemana,
+      visitasRealizadasMes,
+      propostasEnviadasMes: propostasEnviadas,
+      vgvFechadoMes: vgvFechado,
+      comissaoEstimada,
+      txLeadVisita,
+      txVisitaProposta,
+      txPropostaFechamento,
+      imoveisDisponiveis: imoveis.length,
+      leadsSemContato4h: leadsSemContato,
     });
 
-    setLeadsRecentes(leadsRecentesRes.data || []);
-
-    // Payments
-    const pagamentos: PagamentoProximo[] = (parcelasRes.data || []).map((p: any) => ({
-      id: p.id, cliente_nome: p.contratos?.cliente_nome || "—", valor: Number(p.valor), data_vencimento: p.data_vencimento, status: p.status,
+    // Visitas de hoje
+    const vh = (visitasHojeRes.data || []).map((v: any) => ({
+      id: v.id,
+      hora_visita: v.hora_visita,
+      status: v.status,
+      lead_nome: v.lead?.nome || "Lead não vinculado",
+      imovel_endereco: v.imovel
+        ? `${v.imovel.endereco || ""}${v.imovel.bairro ? `, ${v.imovel.bairro}` : ""}`
+        : "Imóvel não vinculado",
     }));
-    setPagamentosProximos(pagamentos);
+    setVisitasHoje(vh);
 
-    // Tarefas de hoje (atrasadas + hoje)
-    const tarefasData: TarefaHoje[] = (tarefasRes.data || []).map((t: any) => {
-      let tipo: "atrasada" | "hoje" | "proxima" = "proxima";
-      if (t.data_vencimento) {
-        if (t.data_vencimento < today) tipo = "atrasada";
-        else if (t.data_vencimento === today) tipo = "hoje";
-      }
-      return { ...t, tipo };
-    });
-    setTarefasHoje(tarefasData);
+    setLeadsRecentes((leadsRecentesRes.data as LeadRecente[]) || []);
+    setTarefasHoje((tarefasRes.data as TarefaHoje[]) || []);
 
-    // Contratos pendentes
-    setContratosPendentes((contratosRes.data as ContratoPendente[]) || []);
-
-    // Email stats
-    const emailContatos = emailContatosRes.data || [];
-    const filaHoje = emailContatos.filter((e: any) => e.status_envio === "pendente").length;
-    const enviadosHoje = emailContatos.filter((e: any) => e.status_envio === "enviado" || e.enviado_em).length;
-    const abertosHoje = emailContatos.filter((e: any) => e.aberto_em).length;
-    const txAbertura = enviadosHoje > 0 ? Math.round((abertosHoje / enviadosHoje) * 100) : 0;
-    setEmailStats({ fila: filaHoje, enviados: enviadosHoje, abertos: abertosHoje, taxaAbertura: txAbertura });
-
-    // Weekly leads
-    const allLeads = allLeadsRes.data || [];
-    const weeks: WeeklyLeads[] = [];
-    for (let i = 3; i >= 0; i--) {
-      const refDate = subDays(now, i * 7);
-      const weekStart = startOfWeek(refDate, { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(refDate, { weekStartsOn: 1 });
-      const count = allLeads.filter(l => { if (!l.criado_em) return false; const d = new Date(l.criado_em); return isWithinInterval(d, { start: weekStart, end: weekEnd }); }).length;
-      weeks.push({ semana: format(weekStart, "dd/MM", { locale: ptBR }), leads: count });
+    // Gráfico — leads por semana (últimas 8 semanas)
+    const semanas: { semana: string; leads: number }[] = [];
+    for (let i = 7; i >= 0; i--) {
+      const inicio = format(subMonths(startOfWeek(now, { weekStartsOn: 1 }), 0), "yyyy-MM-dd");
+      const semanaIdx = addDays(startOfWeek(now, { weekStartsOn: 1 }), -i * 7);
+      const fimSemana = addDays(semanaIdx, 6);
+      const { count } = await supabase
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .gte("criado_em", semanaIdx.toISOString())
+        .lte("criado_em", fimSemana.toISOString());
+      semanas.push({
+        semana: format(semanaIdx, "dd/MM", { locale: ptBR }),
+        leads: count || 0,
+      });
     }
-    setWeeklyLeadsData(weeks);
+    setWeeklyLeadsData(semanas);
 
-    // Monthly revenue
-    const monthlyData: MonthlyRevenue[] = [];
-    for (let i = 5; i >= 0; i--) {
-      const monthDate = subMonths(now, i);
-      const mStart = format(startOfMonth(monthDate), "yyyy-MM-dd");
-      const mEnd = format(endOfMonth(monthDate), "yyyy-MM-dd");
-      const { data: mParcelas } = await supabase.from("parcelas").select("valor").eq("status", "pago").gte("data_pagamento", mStart).lte("data_pagamento", mEnd);
-      const dev = (mParcelas || []).reduce((s, p) => s + Number(p.valor), 0);
-      monthlyData.push({ mes: format(monthDate, "MMM", { locale: ptBR }), desenvolvimento: dev, recorrente: receitaRecorrente });
-    }
-    setMonthlyRevenueData(monthlyData);
     setLoading(false);
   }
 
-  async function handleToggleTarefa(id: string, concluida: boolean) {
-    const { error } = await supabase.from("tarefas").update({ concluida, status: concluida ? "concluida" : "a_fazer" }).eq("id", id);
-    if (error) {
-      toast({ title: "Erro ao atualizar tarefa", variant: "destructive" });
-    } else {
-      toast({ title: concluida ? "Tarefa concluída!" : "Tarefa reaberta" });
-      setTarefasHoje(prev => prev.filter(t => t.id !== id));
-    }
+  async function handleToggleTarefa(id: string) {
+    await supabase.from("tarefas").update({ concluida: true, status: "feito" }).eq("id", id);
+    setTarefasHoje(prev => prev.filter(t => t.id !== id));
+    toast({ title: "Tarefa concluída!" });
   }
 
-  const kpiCards = [
-    { title: "Leads do Mês", value: String(kpis.leadsDoMes), icon: Users },
-    { title: "Reuniões Agendadas", value: String(kpis.reunioesAgendadas), icon: Calendar },
-    { title: "Taxa Resposta Email", value: `${kpis.taxaRespostaEmail}%`, icon: Mail },
-    { title: "Taxa Resposta WhatsApp", value: `${kpis.taxaRespostaWhatsapp}%`, icon: MessageSquare },
-    { title: "Faturamento do Mês", value: formatCurrency(kpis.faturamentoMes), icon: DollarSign },
-    { title: "Margem Líquida", value: formatCurrency(kpis.margemLiquida), icon: TrendingUp, subtitle: kpis.faturamentoMes > 0 ? `${Math.round((kpis.margemLiquida / kpis.faturamentoMes) * 100)}%` : "0%" },
-  ];
-
-  const chartTooltipStyle = { backgroundColor: "hsl(0 0% 7%)", border: "1px solid hsl(0 0% 14%)", borderRadius: "8px", color: "hsl(0 0% 95%)" };
+  const KpiCard = ({
+    title, value, subtitle, icon: Icon, color = "text-primary", alert = false, onClick,
+  }: {
+    title: string; value: string | number; subtitle?: string;
+    icon: any; color?: string; alert?: boolean; onClick?: () => void;
+  }) => (
+    <Card
+      className={`transition-all ${alert ? "border-destructive/50 bg-destructive/5" : ""} ${onClick ? "cursor-pointer hover:shadow-md hover:border-primary/40" : ""}`}
+      onClick={onClick}
+    >
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-muted-foreground font-medium">{title}</p>
+            <p className={`text-2xl font-bold mt-0.5 ${alert ? "text-destructive" : color}`}>{value}</p>
+            {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
+          </div>
+          <div className={`p-2.5 rounded-xl ${alert ? "bg-destructive/10" : "bg-primary/10"}`}>
+            <Icon className={`h-5 w-5 ${alert ? "text-destructive" : color}`} />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="p-6 space-y-5">
+        <Skeleton className="h-8 w-48" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" className="gap-1.5" variant="outline" onClick={() => navigate("/tarefas")}>
-          <Plus className="h-3.5 w-3.5" />Nova Tarefa
-        </Button>
-        <Button size="sm" className="gap-1.5" variant="outline" onClick={() => navigate("/crm")}>
-          <Users className="h-3.5 w-3.5" />Novo Lead
-        </Button>
-        <Button size="sm" className="gap-1.5" variant="outline" onClick={() => navigate("/contratos")}>
-          <FileText className="h-3.5 w-3.5" />Gerar Contrato
-        </Button>
-        <Button size="sm" className="gap-1.5" variant="outline" onClick={() => navigate("/comunicacoes")}>
-          <Upload className="h-3.5 w-3.5" />Importar Emails
-        </Button>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {kpiCards.map((kpi) => (
-          <Card key={kpi.title} className="glass-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">{kpi.title}</CardTitle>
-              <kpi.icon className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl font-bold">{kpi.value}</div>
-              {"subtitle" in kpi && kpi.subtitle && (
-                <p className="text-xs text-muted-foreground mt-1">{kpi.subtitle}</p>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Metas de Faturamento e MRR */}
-      {(metaFaturamento > 0 || metaMRR > 0) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {metaFaturamento > 0 && (
-            <Card className="glass-card">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2"><Target className="h-4 w-4 text-primary" />Meta de Faturamento</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-end justify-between mb-2">
-                  <p className="text-xl font-bold text-primary">{formatCurrency(kpis.faturamentoMes)}</p>
-                  <p className="text-xs text-muted-foreground">de {formatCurrency(metaFaturamento)}</p>
-                </div>
-                <Progress value={Math.min((kpis.faturamentoMes / metaFaturamento) * 100, 100)} className="h-2.5" />
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  {Math.round((kpis.faturamentoMes / metaFaturamento) * 100)}% — faltam {formatCurrency(Math.max(metaFaturamento - kpis.faturamentoMes, 0))}
-                </p>
-              </CardContent>
-            </Card>
-          )}
-          {metaMRR > 0 && (
-            <Card className="glass-card">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2"><Target className="h-4 w-4 text-accent" />Meta de MRR</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-end justify-between mb-2">
-                  <p className="text-xl font-bold text-accent">{formatCurrency(mrrAtual)}</p>
-                  <p className="text-xs text-muted-foreground">de {formatCurrency(metaMRR)}</p>
-                </div>
-                <Progress value={Math.min((mrrAtual / metaMRR) * 100, 100)} className="h-2.5" />
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  {Math.round((mrrAtual / metaMRR) * 100)}% — faltam {formatCurrency(Math.max(metaMRR - mrrAtual, 0))}
-                </p>
-              </CardContent>
-            </Card>
-          )}
+        <div>
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
+            {format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+          </p>
         </div>
+        {/* Quick Actions */}
+        <div className="flex gap-2 flex-wrap">
+          <Button size="sm" onClick={() => navigate("/crm")}>
+            <Users className="h-4 w-4 mr-1" /> Novo Lead
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => navigate("/imoveis")}>
+            <Home className="h-4 w-4 mr-1" /> Cadastrar Imóvel
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => navigate("/contratos")}>
+            <FileText className="h-4 w-4 mr-1" /> Gerar Contrato
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => navigate("/agenda")}>
+            <Calendar className="h-4 w-4 mr-1" /> Nova Visita
+          </Button>
+        </div>
+      </div>
+
+      {/* Alerta: leads sem contato */}
+      {kpis.leadsSemContato4h > 0 && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="p-4 flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-destructive">
+                {kpis.leadsSemContato4h} lead{kpis.leadsSemContato4h > 1 ? "s" : ""} sem contato há mais de 4 horas
+              </p>
+              <p className="text-xs text-muted-foreground">Ação rápida pode evitar perda de oportunidade.</p>
+            </div>
+            <Button size="sm" variant="destructive" onClick={() => navigate("/crm")}>
+              Ver no CRM
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Tarefas de Hoje */}
-        <Card className="glass-card">
-          <CardHeader className="flex flex-row items-center gap-2 pb-2">
-            <CheckSquare className="h-4 w-4 text-warning" />
-            <CardTitle className="text-sm">Tarefas de Hoje</CardTitle>
-            <Badge variant="outline" className="ml-auto text-xs">{tarefasHoje.length}</Badge>
+      {/* KPIs principais */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <KpiCard title="Leads do Mês" value={kpis.leadsDoMes} icon={Users} onClick={() => navigate("/crm")} />
+        <KpiCard title="Visitas esta Semana" value={kpis.visitasAgendadasSemana} subtitle="Agendadas/confirmadas" icon={Calendar} onClick={() => navigate("/agenda")} />
+        <KpiCard title="Visitas Realizadas" value={kpis.visitasRealizadasMes} subtitle="Neste mês" icon={CheckSquare} onClick={() => navigate("/agenda")} />
+        <KpiCard title="Propostas Enviadas" value={kpis.propostasEnviadasMes} subtitle="Mês atual" icon={FileText} onClick={() => navigate("/crm")} />
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <KpiCard
+          title="VGV Fechado no Mês"
+          value={formatCurrency(kpis.vgvFechadoMes)}
+          subtitle="Valor Geral de Vendas"
+          icon={DollarSign}
+          color="text-emerald-500"
+          onClick={() => navigate("/relatorios")}
+        />
+        <KpiCard
+          title="Comissão Estimada"
+          value={formatCurrency(kpis.comissaoEstimada)}
+          subtitle="5% sobre VGV"
+          icon={TrendingUp}
+          color="text-emerald-500"
+          onClick={() => navigate("/relatorios")}
+        />
+        <KpiCard
+          title="Imóveis em Carteira"
+          value={kpis.imoveisDisponiveis}
+          subtitle="Disponíveis"
+          icon={Home}
+          onClick={() => navigate("/imoveis")}
+        />
+        <KpiCard
+          title="Leads Sem Resposta"
+          value={kpis.leadsSemContato4h}
+          subtitle="> 4 horas"
+          icon={AlertTriangle}
+          alert={kpis.leadsSemContato4h > 0}
+          onClick={() => navigate("/crm")}
+        />
+      </div>
+
+      {/* Taxas de conversão */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <BarChart2 className="h-4 w-4 text-primary" />
+            Taxas de Conversão do Funil
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { label: "Lead → Visita", value: kpis.txLeadVisita },
+              { label: "Visita → Proposta", value: kpis.txVisitaProposta },
+              { label: "Proposta → Fechamento", value: kpis.txPropostaFechamento },
+            ].map(({ label, value }) => (
+              <div key={label} className="text-center">
+                <div className={`text-2xl font-bold ${value >= 30 ? "text-emerald-500" : value >= 15 ? "text-yellow-500" : "text-destructive"}`}>
+                  {value}%
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+                <div className="w-full bg-muted rounded-full h-1.5 mt-2">
+                  <div
+                    className={`h-1.5 rounded-full transition-all ${value >= 30 ? "bg-emerald-500" : value >= 15 ? "bg-yellow-500" : "bg-destructive"}`}
+                    style={{ width: `${Math.min(value, 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Gráfico de leads semanais */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Leads por Semana (últimas 8 semanas)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={weeklyLeadsData}>
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                <XAxis dataKey="semana" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip
+                  formatter={(v) => [`${v} leads`, "Leads"]}
+                  contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
+                />
+                <Bar dataKey="leads" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Leads recentes */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm">Leads Recentes</CardTitle>
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => navigate("/crm")}>
+                Ver todos <ArrowRight className="h-3 w-3 ml-1" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {leadsRecentes.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-4 text-center">Nenhum lead neste mês.</p>
+            ) : (
+              leadsRecentes.map(lead => (
+                <div
+                  key={lead.id}
+                  className="flex items-center gap-2 text-sm cursor-pointer rounded-md px-1 py-0.5 -mx-1 hover:bg-muted/60 transition-colors"
+                  onClick={() => navigate("/crm")}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-xs truncate">{lead.nome}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {ORIGEM_ICONS[lead.origem_portal || "manual"] || "✋"} {lead.status?.replace(/_/g, " ")}
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="text-[10px] shrink-0">
+                    {format(new Date(lead.criado_em), "dd/MM")}
+                  </Badge>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Visitas de Hoje */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-primary" />
+                Visitas de Hoje
+                {visitasHoje.length > 0 && (
+                  <Badge className="text-xs">{visitasHoje.length}</Badge>
+                )}
+              </CardTitle>
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => navigate("/agenda")}>
+                Ver agenda <ArrowRight className="h-3 w-3 ml-1" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {visitasHoje.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                <Calendar className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                <p className="text-sm">Nenhuma visita agendada para hoje.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {visitasHoje.map(v => (
+                  <div key={v.id} className="flex items-start gap-3 p-2.5 rounded-lg bg-muted/30 border border-border/50 cursor-pointer hover:border-primary/40 hover:bg-muted/50 transition-all" onClick={() => navigate("/agenda")}>
+                    <div className="text-center min-w-[42px]">
+                      <span className="text-sm font-bold">{v.hora_visita.slice(0, 5)}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{v.lead_nome}</p>
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        {v.imovel_endereco}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] shrink-0 ${v.status === "realizada" ? "bg-green-500/15 text-green-600 border-green-500/30" : "bg-blue-500/15 text-blue-600 border-blue-500/30"}`}
+                    >
+                      {v.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Tarefas do dia */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <CheckSquare className="h-4 w-4 text-primary" />
+                Tarefas Pendentes
+              </CardTitle>
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => navigate("/tarefas")}>
+                Ver todas <ArrowRight className="h-3 w-3 ml-1" />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {tarefasHoje.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma tarefa pendente para hoje 🎉</p>
+              <div className="text-center py-6 text-muted-foreground">
+                <CheckSquare className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                <p className="text-sm">Nenhuma tarefa pendente.</p>
+              </div>
             ) : (
               <div className="space-y-2">
-                {tarefasHoje.map((t) => (
-                  <div key={t.id} className="flex items-start gap-2 py-1.5 border-b border-border last:border-0">
+                {tarefasHoje.map(t => (
+                  <div key={t.id} className="flex items-center gap-2.5 cursor-pointer rounded-md px-1 py-0.5 -mx-1 hover:bg-muted/60 transition-colors" onClick={() => navigate("/tarefas")}>
                     <Checkbox
                       checked={t.concluida}
-                      onCheckedChange={(checked) => handleToggleTarefa(t.id, !!checked)}
-                      className="mt-0.5"
+                      onCheckedChange={(checked) => { if (checked) handleToggleTarefa(t.id); }}
+                      onClick={(e) => e.stopPropagation()}
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{t.titulo}</p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        {t.tipo === "atrasada" && <AlertTriangle className="h-3 w-3 text-destructive" />}
-                        {t.tipo === "hoje" && <Clock className="h-3 w-3 text-warning" />}
-                        <span className={`text-[10px] ${t.tipo === "atrasada" ? "text-destructive" : "text-muted-foreground"}`}>
-                          {t.tipo === "atrasada" ? "Atrasada" : "Vence hoje"}
-                        </span>
-                        <Badge variant="outline" className="text-[10px] capitalize ml-1">{t.prioridade}</Badge>
-                      </div>
+                      <p className="text-sm truncate">{t.titulo}</p>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Cadência de Emails */}
-        <Card className="glass-card">
-          <CardHeader className="flex flex-row items-center gap-2 pb-2">
-            <Mail className="h-4 w-4 text-primary" />
-            <CardTitle className="text-sm">Cadência de Emails</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="text-center p-3 rounded-lg bg-secondary/30">
-                <p className="text-2xl font-bold text-warning">{emailStats.fila}</p>
-                <p className="text-[10px] text-muted-foreground">Na fila</p>
-              </div>
-              <div className="text-center p-3 rounded-lg bg-secondary/30">
-                <p className="text-2xl font-bold text-primary">{emailStats.enviados}</p>
-                <p className="text-[10px] text-muted-foreground">Enviados</p>
-              </div>
-              <div className="text-center p-3 rounded-lg bg-secondary/30">
-                <p className="text-2xl font-bold text-accent">{emailStats.abertos}</p>
-                <p className="text-[10px] text-muted-foreground">Abertos</p>
-              </div>
-              <div className="text-center p-3 rounded-lg bg-secondary/30">
-                <p className="text-2xl font-bold">{emailStats.taxaAbertura}%</p>
-                <p className="text-[10px] text-muted-foreground">Taxa abertura</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Contratos Pendentes */}
-        <Card className="glass-card">
-          <CardHeader className="flex flex-row items-center gap-2 pb-2">
-            <FileText className="h-4 w-4 text-accent" />
-            <CardTitle className="text-sm">Contratos Pendentes</CardTitle>
-            <Badge variant="outline" className="ml-auto text-xs">{contratosPendentes.length}</Badge>
-          </CardHeader>
-          <CardContent>
-            {contratosPendentes.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">Nenhum contrato pendente</p>
-            ) : (
-              <div className="space-y-2">
-                {contratosPendentes.map((c) => (
-                  <div key={c.id} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{c.cliente_nome}</p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <Badge variant="outline" className="text-[10px] capitalize">{c.status.replace("_", " ")}</Badge>
-                      </div>
-                    </div>
-                    <p className="text-sm font-semibold text-primary ml-2">{formatCurrency(c.valor_total)}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* IA / WhatsApp Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* WhatsApp Hoje */}
-        <Card className="glass-card cursor-pointer hover:border-primary/30 transition-colors" onClick={() => navigate("/crm")}>
-          <CardHeader className="flex flex-row items-center gap-2 pb-2">
-            <MessageCircle className="h-4 w-4 text-green-500" />
-            <CardTitle className="text-sm">WhatsApp Hoje</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div>
-                <p className="text-xl font-bold text-green-500">{wppStats.recebidas}</p>
-                <p className="text-[10px] text-muted-foreground">Recebidas</p>
-              </div>
-              <div>
-                <p className="text-xl font-bold text-primary">{wppStats.enviadas}</p>
-                <p className="text-[10px] text-muted-foreground">Enviadas</p>
-              </div>
-              <div>
-                <p className="text-xl font-bold">{wppStats.leads_novos}</p>
-                <p className="text-[10px] text-muted-foreground">Leads ativos</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Último Relatório */}
-        <Card className="glass-card cursor-pointer hover:border-primary/30 transition-colors" onClick={() => navigate("/relatorios")}>
-          <CardHeader className="flex flex-row items-center gap-2 pb-2">
-            <BarChart2 className="h-4 w-4 text-accent" />
-            <CardTitle className="text-sm">Último Relatório</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {ultimoRelatorio ? (
-              <>
-                <p className="text-xs text-muted-foreground mb-2">
-                  {new Date(ultimoRelatorio.semana_inicio + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} —{" "}
-                  {new Date(ultimoRelatorio.semana_fim + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
-                </p>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div>
-                    <p className="text-xl font-bold">{ultimoRelatorio.total_leads_abordados}</p>
-                    <p className="text-[10px] text-muted-foreground">Abordados</p>
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-primary">{ultimoRelatorio.taxa_resposta}%</p>
-                    <p className="text-[10px] text-muted-foreground">Responderam</p>
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-accent">{ultimoRelatorio.taxa_conversao}%</p>
-                    <p className="text-[10px] text-muted-foreground">Conversão</p>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-3">Nenhum relatório ainda</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Sugestões da IA */}
-        <Card className="glass-card cursor-pointer hover:border-primary/30 transition-colors" onClick={() => navigate("/crm")}>
-          <CardHeader className="flex flex-row items-center gap-2 pb-2">
-            <Bot className="h-4 w-4 text-primary" />
-            <CardTitle className="text-sm">Sugestões da IA</CardTitle>
-            {sugestoesIaPendentes > 0 && (
-              <Badge className="ml-auto text-[10px] bg-warning/20 text-warning border-warning/20">
-                {sugestoesIaPendentes} pendente{sugestoesIaPendentes > 1 ? "s" : ""}
-              </Badge>
-            )}
-          </CardHeader>
-          <CardContent>
-            {sugestoesIaPendentes === 0 ? (
-              <div className="text-center py-3">
-                <Bot className="h-8 w-8 text-muted-foreground/30 mx-auto mb-1" />
-                <p className="text-xs text-muted-foreground">Nenhuma sugestão pendente</p>
-              </div>
-            ) : (
-              <div className="text-center py-2">
-                <p className="text-3xl font-bold text-primary">{sugestoesIaPendentes}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  mudança{sugestoesIaPendentes > 1 ? "s" : ""} de estágio para revisar
-                </p>
-                <p className="text-xs text-primary mt-2">Abrir CRM →</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="glass-card">
-          <CardHeader><CardTitle className="text-sm">Leads por Semana</CardTitle></CardHeader>
-          <CardContent className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={weeklyLeadsData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 14%)" />
-                <XAxis dataKey="semana" tick={{ fill: "hsl(0 0% 55%)", fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "hsl(0 0% 55%)", fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip contentStyle={chartTooltipStyle} />
-                <Bar dataKey="leads" fill="url(#gradientBar)" radius={[4, 4, 0, 0]} />
-                <defs>
-                  <linearGradient id="gradientBar" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(252 100% 64%)" />
-                    <stop offset="100%" stopColor="hsl(187 100% 50%)" />
-                  </linearGradient>
-                </defs>
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card">
-          <CardHeader><CardTitle className="text-sm">Faturamento — Últimos 6 Meses</CardTitle></CardHeader>
-          <CardContent className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyRevenueData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 14%)" />
-                <XAxis dataKey="mes" tick={{ fill: "hsl(0 0% 55%)", fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "hsl(0 0% 55%)", fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip contentStyle={chartTooltipStyle} formatter={(value: number) => formatCurrency(value)} />
-                <Legend wrapperStyle={{ color: "hsl(0 0% 55%)" }} />
-                <Bar dataKey="desenvolvimento" name="Desenvolvimento" fill="hsl(252 100% 64%)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="recorrente" name="Recorrente" fill="hsl(187 100% 50%)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Bottom Lists */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="glass-card">
-          <CardHeader><CardTitle className="text-sm">Leads Recentes</CardTitle></CardHeader>
-          <CardContent>
-            {leadsRecentes.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhum lead cadastrado ainda.</p>
-            ) : (
-              <div className="space-y-3">
-                {leadsRecentes.map((lead) => (
-                  <div key={lead.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                    <div>
-                      <p className="text-sm font-medium">{lead.nome}</p>
-                      <p className="text-xs text-muted-foreground">{lead.empresa || "Sem empresa"}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge className={`text-xs ${getScoreColor(lead.score)}`}>{lead.score ?? 0}</Badge>
-                      <Badge variant="outline" className="text-xs capitalize">{lead.status || "novo"}</Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card">
-          <CardHeader><CardTitle className="text-sm">Pagamentos Próximos (7 dias)</CardTitle></CardHeader>
-          <CardContent>
-            {pagamentosProximos.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhum pagamento pendente nos próximos 7 dias.</p>
-            ) : (
-              <div className="space-y-3">
-                {pagamentosProximos.map((pag) => (
-                  <div key={pag.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                    <div>
-                      <p className="text-sm font-medium">{pag.cliente_nome}</p>
-                      <p className="text-xs text-muted-foreground">Vence em {format(new Date(pag.data_vencimento + "T00:00:00"), "dd/MM/yyyy")}</p>
-                    </div>
-                    <span className="text-sm font-semibold text-warning">{formatCurrency(pag.valor)}</span>
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] shrink-0 ${
+                        t.prioridade === "alta"
+                          ? "bg-red-500/10 text-red-500 border-red-500/30"
+                          : t.prioridade === "media"
+                          ? "bg-yellow-500/10 text-yellow-600 border-yellow-500/30"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {t.prioridade}
+                    </Badge>
                   </div>
                 ))}
               </div>

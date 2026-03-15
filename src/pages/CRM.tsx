@@ -9,14 +9,19 @@ import LeadCard from "@/components/crm/LeadCard";
 import LeadDrawer from "@/components/crm/LeadDrawer";
 import AddLeadDialog from "@/components/crm/AddLeadDialog";
 import type { Tables } from "@/integrations/supabase/types";
+import { Button } from "@/components/ui/button";
+import { Users, User } from "lucide-react";
 
 type Lead = Tables<"leads">;
 
 const COLUNAS = [
-  { id: "novo", title: "Novo" },
-  { id: "enriquecido", title: "Enriquecido" },
+  { id: "novo_lead", title: "Novo Lead" },
   { id: "contatado", title: "Contatado" },
-  { id: "reuniao_agendada", title: "Reunião Agendada" },
+  { id: "visita_agendada", title: "Visita Agendada" },
+  { id: "visita_realizada", title: "Visita Realizada" },
+  { id: "proposta_enviada", title: "Proposta Enviada" },
+  { id: "negociando", title: "Negociando" },
+  { id: "contrato_assinado", title: "Contrato Assinado" },
   { id: "perdido", title: "Perdido" },
 ];
 
@@ -26,6 +31,8 @@ export default function CRM() {
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
   const [drawerLead, setDrawerLead] = useState<Lead | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [filterMeus, setFilterMeus] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -35,6 +42,10 @@ export default function CRM() {
     const { data } = await supabase.from("leads").select("*").order("criado_em", { ascending: false });
     setLeads(data || []);
     setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id || null));
   }, []);
 
   useEffect(() => {
@@ -51,7 +62,13 @@ export default function CRM() {
   }, [fetchLeads]);
 
   function getLeadsByStatus(status: string) {
-    return leads.filter(l => (l.status || "novo") === status);
+    return leads.filter(l => {
+      if ((l.status || "novo_lead") !== status) return false;
+      if (filterMeus && currentUserId) {
+        return (l as any).corretor_responsavel === currentUserId;
+      }
+      return true;
+    });
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -76,19 +93,36 @@ export default function CRM() {
       // Dropped over another lead — find which column that lead is in
       const overLead = leads.find(l => l.id === over.id);
       if (overLead) {
-        newStatus = overLead.status || "novo";
+        newStatus = overLead.status || "novo_lead";
       }
     }
 
     if (!newStatus) return;
 
     const currentLead = leads.find(l => l.id === leadId);
-    if (currentLead && (currentLead.status || "novo") === newStatus) return;
+    if (currentLead && (currentLead.status || "novo_lead") === newStatus) return;
 
     // Optimistic update
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: newStatus! } : l));
 
     await supabase.from("leads").update({ status: newStatus }).eq("id", leadId);
+
+    // Trigger post-sale automation on drag to contrato_assinado
+    if (newStatus === "contrato_assinado") {
+      const lead = leads.find(l => l.id === leadId);
+      if (lead) {
+        const { data: { user } } = await supabase.auth.getUser();
+        supabase.functions.invoke("pos-venda-automation", {
+          body: {
+            action: "criar_tarefas",
+            user_id: user?.id,
+            lead_id: leadId,
+            lead_nome: lead.nome,
+            corretor_id: (lead as any).corretor_responsavel,
+          },
+        }).catch(() => {});
+      }
+    }
   }
 
   function handleDragOver(event: DragOverEvent) {
@@ -104,6 +138,23 @@ export default function CRM() {
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: newStatus } : l));
     setDrawerLead(prev => prev && prev.id === leadId ? { ...prev, status: newStatus } : prev);
     await supabase.from("leads").update({ status: newStatus }).eq("id", leadId);
+
+    // Trigger post-sale automation when deal is closed
+    if (newStatus === "contrato_assinado") {
+      const lead = leads.find(l => l.id === leadId);
+      if (lead) {
+        const { data: { user } } = await supabase.auth.getUser();
+        supabase.functions.invoke("pos-venda-automation", {
+          body: {
+            action: "criar_tarefas",
+            user_id: user?.id,
+            lead_id: leadId,
+            lead_nome: lead.nome,
+            corretor_id: (lead as any).corretor_responsavel,
+          },
+        }).catch(() => {});
+      }
+    }
   }
 
   function handleLeadUpdate(updatedLead: Lead) {
@@ -121,9 +172,29 @@ export default function CRM() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold">CRM — Pipeline de Leads</h1>
-        <AddLeadDialog />
+        <div className="flex items-center gap-2">
+          <div className="flex border border-border rounded-md">
+            <Button
+              variant={!filterMeus ? "secondary" : "ghost"}
+              size="sm"
+              className="text-xs gap-1.5 rounded-r-none"
+              onClick={() => setFilterMeus(false)}
+            >
+              <Users className="h-3.5 w-3.5" /> Todos
+            </Button>
+            <Button
+              variant={filterMeus ? "secondary" : "ghost"}
+              size="sm"
+              className="text-xs gap-1.5 rounded-l-none"
+              onClick={() => setFilterMeus(true)}
+            >
+              <User className="h-3.5 w-3.5" /> Meus Leads
+            </Button>
+          </div>
+          <AddLeadDialog />
+        </div>
       </div>
 
       <div className="overflow-x-auto pb-4">

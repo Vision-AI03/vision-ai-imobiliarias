@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bell, Check, DollarSign, Target, Mail, CheckSquare, Key, FileText, ChevronLeft, ChevronRight, Trash2, RefreshCw, Bot, MessageCircle, BarChart2 } from "lucide-react";
+import { Bell, Check, DollarSign, Target, Mail, CheckSquare, Key, FileText, ChevronLeft, ChevronRight, Trash2, RefreshCw, Bot, MessageCircle, BarChart2, Calendar, AlertTriangle, Trophy, Home, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +23,7 @@ interface Notificacao {
 }
 
 const tipoIcons: Record<string, React.ReactNode> = {
+  // Genéricos
   parcela_vencendo: <DollarSign className="h-4 w-4 text-yellow-500" />,
   parcela_vencida: <DollarSign className="h-4 w-4 text-destructive" />,
   lead_parado: <Target className="h-4 w-4 text-orange-500" />,
@@ -34,9 +35,19 @@ const tipoIcons: Record<string, React.ReactNode> = {
   estagio_mudou_ia: <Bot className="h-4 w-4 text-primary" />,
   sugestao_estagio_ia: <Bot className="h-4 w-4 text-yellow-500" />,
   relatorio_semanal: <BarChart2 className="h-4 w-4 text-accent" />,
+  // Imobiliários
+  visita_proxima: <Calendar className="h-4 w-4 text-blue-500" />,
+  lead_sem_contato: <AlertTriangle className="h-4 w-4 text-orange-500" />,
+  lead_prioritario_parado: <AlertTriangle className="h-4 w-4 text-destructive" />,
+  meta_atingida: <Trophy className="h-4 w-4 text-yellow-500" />,
+  contrato_assinado_alerta: <Home className="h-4 w-4 text-green-500" />,
+  novo_lead: <Target className="h-4 w-4 text-primary" />,
+  prazo_decisao_alerta: <AlertTriangle className="h-4 w-4 text-red-500" />,
+  aniversario_cliente: <Bell className="h-4 w-4 text-pink-500" />,
 };
 
 const tipoLabels: Record<string, string> = {
+  // Genéricos
   parcela_vencendo: "Parcela Vencendo",
   parcela_vencida: "Parcela Vencida",
   lead_parado: "Lead Parado",
@@ -48,6 +59,15 @@ const tipoLabels: Record<string, string> = {
   estagio_mudou_ia: "IA — Estágio Atualizado",
   sugestao_estagio_ia: "IA — Sugestão Pendente",
   relatorio_semanal: "Relatório Semanal",
+  // Imobiliários
+  visita_proxima: "Visita em 2h",
+  lead_sem_contato: "Lead Sem Contato",
+  lead_prioritario_parado: "Lead Prioritário Parado",
+  meta_atingida: "Meta Atingida",
+  contrato_assinado_alerta: "Contrato Assinado",
+  novo_lead: "Novo Lead",
+  prazo_decisao_alerta: "Prazo de Decisão",
+  aniversario_cliente: "Aniversário do Cliente",
 };
 
 const PAGE_SIZE = 20;
@@ -62,6 +82,7 @@ export default function Notificacoes() {
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const [cleaning, setCleaning] = useState(false);
+  const [checking, setChecking] = useState(false);
 
   const fetchNotificacoes = async () => {
     setLoading(true);
@@ -219,6 +240,28 @@ export default function Notificacoes() {
     setCleaning(false);
   };
 
+  const runChecks = async () => {
+    setChecking(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data, error } = await supabase.functions.invoke("notify-imobiliaria-checks", {
+        body: { user_id: user?.id },
+      });
+      if (error) throw error;
+      const generated = (data as any)?.summary?.[user?.id || ""]?.generated ?? 0;
+      toast({
+        title: generated > 0
+          ? `${generated} novo(s) alerta(s) gerado(s)!`
+          : "Nenhum novo alerta no momento",
+      });
+      await fetchNotificacoes();
+    } catch (err: any) {
+      toast({ title: "Erro ao verificar alertas", description: err.message, variant: "destructive" });
+    } finally {
+      setChecking(false);
+    }
+  };
+
   const deleteAll = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -243,6 +286,12 @@ export default function Notificacoes() {
           <h1 className="text-2xl font-bold">Notificações</h1>
           <p className="text-muted-foreground">Gerencie todas as notificações do sistema</p>
         </div>
+        <Button onClick={runChecks} disabled={checking} variant="outline" size="sm" className="gap-1.5">
+          {checking
+            ? <Loader2 className="h-4 w-4 animate-spin" />
+            : <Bell className="h-4 w-4" />}
+          {checking ? "Verificando..." : "Verificar Alertas"}
+        </Button>
       </div>
 
       <Tabs defaultValue="todas">

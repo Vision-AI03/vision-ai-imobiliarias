@@ -6,7 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Mail, MailCheck, MessageSquare, CheckCheck, ExternalLink, Calendar, Building2, User, Globe, Linkedin, Sparkles, Loader2, Send, Trash2, Bot } from "lucide-react";
+import { Mail, MailCheck, MessageSquare, CheckCheck, ExternalLink, Calendar, Building2, User, Globe, Linkedin, Sparkles, Loader2, Send, Trash2, Bot, ChevronDown, ChevronUp, CheckSquare, MapPin, Clock } from "lucide-react";
+import { CalculadoraFinanciamento } from "@/components/financiamento/CalculadoraFinanciamento";
 import { WhatsAppTab } from "@/components/crm/WhatsAppTab";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -21,12 +22,37 @@ import type { Tables } from "@/integrations/supabase/types";
 type Lead = Tables<"leads">;
 
 const COLUNAS = [
-  { value: "novo", label: "Novo" },
-  { value: "enriquecido", label: "Enriquecido" },
+  { value: "novo_lead", label: "Novo Lead" },
   { value: "contatado", label: "Contatado" },
-  { value: "reuniao_agendada", label: "Reunião Agendada" },
+  { value: "visita_agendada", label: "Visita Agendada" },
+  { value: "visita_realizada", label: "Visita Realizada" },
+  { value: "proposta_enviada", label: "Proposta Enviada" },
+  { value: "negociando", label: "Negociando" },
+  { value: "contrato_assinado", label: "Contrato Assinado" },
   { value: "perdido", label: "Perdido" },
 ];
+
+const MOTIVOS_PERDA = [
+  "Preço acima do orçamento",
+  "Não encontrou imóvel adequado",
+  "Escolheu outra imobiliária",
+  "Desistiu da compra/aluguel",
+  "Financiamento não aprovado",
+  "Sem resposta após follow-up",
+  "Timing — vai buscar depois",
+  "Outro",
+];
+
+const ORIGENS_BADGE: Record<string, string> = {
+  zap: "🏠 ZAP Imóveis",
+  vivareal: "🏠 Viva Real",
+  olx: "🏠 OLX",
+  meta: "📱 Meta Ads",
+  whatsapp: "💬 WhatsApp",
+  site: "🌐 Formulário Site",
+  indicacao: "👤 Indicação",
+  manual: "✋ Manual",
+};
 
 function getScoreColor(score: number | null) {
   const s = score ?? 0;
@@ -44,9 +70,20 @@ interface LeadDrawerProps {
   onLeadDelete?: (leadId: string) => void;
 }
 
+interface TimelineEvent {
+  id: string;
+  type: "email" | "whatsapp" | "tarefa" | "visita" | "criacao";
+  title: string;
+  subtitle?: string;
+  date: string;
+  extra?: string;
+}
+
 export default function LeadDrawer({ lead, open, onClose, onStatusChange, onLeadUpdate, onLeadDelete }: LeadDrawerProps) {
   const [anotacoes, setAnotacoes] = useState("");
   const [comunicacoes, setComunicacoes] = useState<Tables<"comunicacoes">[]>([]);
+  const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
+  const [showCalc, setShowCalc] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [generatingEmail, setGeneratingEmail] = useState(false);
   const [emailDraft, setEmailDraft] = useState<{ assunto: string; conteudo: string } | null>(null);
@@ -59,6 +96,7 @@ export default function LeadDrawer({ lead, open, onClose, onStatusChange, onLead
       setAnotacoes(lead.mensagem_original || "");
       setEmailDraft(null);
       fetchComunicacoes(lead.id);
+      fetchTimeline(lead);
     }
   }, [lead]);
 
@@ -69,6 +107,65 @@ export default function LeadDrawer({ lead, open, onClose, onStatusChange, onLead
       .eq("lead_id", leadId)
       .order("criado_em", { ascending: false });
     setComunicacoes(data || []);
+  }
+
+  async function fetchTimeline(l: Lead) {
+    const [comsRes, tarefasRes, visitasRes] = await Promise.all([
+      supabase.from("comunicacoes").select("id, tipo, direcao, assunto, conteudo, criado_em").eq("lead_id", l.id),
+      supabase.from("tarefas").select("id, titulo, status, concluida, data_vencimento, criado_em").eq("lead_id", l.id),
+      supabase.from("agenda_visitas").select("id, data_visita, hora_visita, status, imovel:imoveis(endereco, bairro)").eq("lead_id", l.id),
+    ]);
+
+    const events: TimelineEvent[] = [];
+
+    // Lead creation
+    events.push({
+      id: "criacao",
+      type: "criacao",
+      title: "Lead criado",
+      subtitle: ORIGENS_BADGE[(l as any).origem_portal] || "Manual",
+      date: l.criado_em,
+    });
+
+    // Communications
+    for (const c of comsRes.data || []) {
+      events.push({
+        id: c.id,
+        type: c.tipo === "whatsapp" ? "whatsapp" : "email",
+        title: c.assunto || (c.tipo === "whatsapp" ? "Mensagem WhatsApp" : "Email"),
+        subtitle: `${c.direcao === "enviado" ? "Enviado" : "Recebido"} · ${c.conteudo?.slice(0, 60) || ""}`,
+        date: c.criado_em,
+      });
+    }
+
+    // Tasks
+    for (const t of tarefasRes.data || []) {
+      events.push({
+        id: t.id,
+        type: "tarefa",
+        title: t.titulo,
+        subtitle: t.concluida ? "Concluída" : t.status?.replace(/_/g, " "),
+        date: t.data_vencimento ? `${t.data_vencimento}T00:00:00` : t.criado_em,
+        extra: t.concluida ? "concluida" : undefined,
+      });
+    }
+
+    // Visits
+    for (const v of visitasRes.data || []) {
+      const imovel = (v as any).imovel;
+      const addr = imovel ? `${imovel.endereco || ""}${imovel.bairro ? `, ${imovel.bairro}` : ""}` : "";
+      events.push({
+        id: v.id,
+        type: "visita",
+        title: `Visita ${v.status === "realizada" ? "realizada" : v.status === "cancelada" ? "cancelada" : "agendada"}`,
+        subtitle: [v.hora_visita?.slice(0, 5), addr].filter(Boolean).join(" · "),
+        date: `${v.data_visita}T${v.hora_visita || "00:00:00"}`,
+        extra: v.status,
+      });
+    }
+
+    events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    setTimeline(events);
   }
 
   async function salvarAnotacoes() {
@@ -194,10 +291,20 @@ export default function LeadDrawer({ lead, open, onClose, onStatusChange, onLead
               {lead.empresa && <p className="text-sm text-muted-foreground">{lead.empresa}</p>}
             </SheetHeader>
 
+            {/* Origem badge */}
+            {(lead as any).origem_portal && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Origem:</span>
+                <span className="text-xs font-medium">
+                  {ORIGENS_BADGE[(lead as any).origem_portal] || (lead as any).origem_portal}
+                </span>
+              </div>
+            )}
+
             {/* Move column */}
             <div className="space-y-1.5">
               <label className="text-xs text-muted-foreground font-medium">Mover para</label>
-              <Select value={lead.status || "novo"} onValueChange={(v) => onStatusChange(lead.id, v)}>
+              <Select value={lead.status || "novo_lead"} onValueChange={(v) => onStatusChange(lead.id, v)}>
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {COLUNAS.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
@@ -220,6 +327,93 @@ export default function LeadDrawer({ lead, open, onClose, onStatusChange, onLead
                 <InfoRow icon={<User className="h-3.5 w-3.5" />} label="Cargo" value={lead.linkedin_cargo} />
               </div>
             </div>
+
+            {/* Motivo de perda — só aparece na coluna perdido */}
+            {lead.status === "perdido" && (
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground font-medium">Motivo da perda</label>
+                <Select
+                  value={(lead as any).motivo_perda || ""}
+                  onValueChange={async (v) => {
+                    await supabase.from("leads").update({ motivo_perda: v } as any).eq("id", lead.id);
+                    if (onLeadUpdate) {
+                      const { data: upd } = await supabase.from("leads").select("*").eq("id", lead.id).maybeSingle();
+                      if (upd) onLeadUpdate(upd);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectContent>
+                    {MOTIVOS_PERDA.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <Separator />
+
+            {/* Interesse Imobiliário */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">
+                Interesse Imobiliário
+              </h4>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <DataBadge label="Tipo de Interesse" value={(lead as any).tipo_interesse} />
+                <DataBadge label="Tipo de Imóvel" value={(lead as any).tipo_imovel} />
+                <DataBadge label="Quartos Desejado" value={(lead as any).quartos_desejado ? `${(lead as any).quartos_desejado}+` : null} />
+                <DataBadge label="Vagas Desejadas" value={(lead as any).vagas_desejado != null ? `${(lead as any).vagas_desejado}` : null} />
+                <DataBadge label="Prazo de Decisão" value={(lead as any).prazo_decisao} />
+                <DataBadge label="Aceita Financiamento" value={(lead as any).aceita_financiamento_lead} />
+                <DataBadge label="Possui FGTS" value={(lead as any).possui_fgts ? "Sim" : null} />
+              </div>
+              {((lead as any).valor_min || (lead as any).valor_max) && (
+                <div className="bg-secondary/50 rounded p-2 text-xs">
+                  <p className="text-muted-foreground text-[10px]">Faixa de Valor</p>
+                  <p className="font-medium">
+                    {(lead as any).valor_min
+                      ? `R$ ${Number((lead as any).valor_min).toLocaleString("pt-BR")}`
+                      : "—"}{" "}
+                    →{" "}
+                    {(lead as any).valor_max
+                      ? `R$ ${Number((lead as any).valor_max).toLocaleString("pt-BR")}`
+                      : "—"}
+                  </p>
+                </div>
+              )}
+              {(lead as any).bairros_interesse?.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-muted-foreground mb-1">Bairros de interesse</p>
+                  <div className="flex flex-wrap gap-1">
+                    {(lead as any).bairros_interesse.map((b: string) => (
+                      <span key={b} className="bg-primary/10 text-primary text-[10px] px-2 py-0.5 rounded-full">
+                        {b}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Calculadora de Financiamento */}
+            {(lead as any).aceita_financiamento_lead && (
+              <div className="rounded-lg border border-border overflow-hidden">
+                <button
+                  className="w-full flex items-center justify-between px-4 py-2.5 bg-secondary/30 hover:bg-secondary/50 transition-colors text-xs font-medium"
+                  onClick={() => setShowCalc(!showCalc)}
+                >
+                  <span>Simulação de Financiamento</span>
+                  {showCalc ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                </button>
+                {showCalc && (
+                  <div className="p-4">
+                    <CalculadoraFinanciamento
+                      valorImovelInicial={(lead as any).valor_max || (lead as any).valor_min || undefined}
+                      compact
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             <Separator />
 
@@ -376,20 +570,46 @@ export default function LeadDrawer({ lead, open, onClose, onStatusChange, onLead
               </TabsList>
 
               <TabsContent value="timeline" className="mt-3">
-                {comunicacoes.length === 0 ? (
+                {timeline.length === 0 ? (
                   <p className="text-xs text-muted-foreground">Nenhuma interação registrada.</p>
                 ) : (
-                  <div className="space-y-2">
-                    {comunicacoes.map(c => (
-                      <div key={c.id} className="bg-secondary/30 rounded p-2 text-xs space-y-1">
-                        <div className="flex items-center justify-between">
-                          <Badge variant="outline" className="text-[10px]">{c.tipo} — {c.direcao}</Badge>
-                          <span className="text-muted-foreground">{format(new Date(c.criado_em), "dd/MM HH:mm")}</span>
+                  <div className="relative space-y-0">
+                    {/* Vertical line */}
+                    <div className="absolute left-3.5 top-4 bottom-0 w-px bg-border" />
+                    {timeline.map((ev, idx) => {
+                      const icons = {
+                        email: <Mail className="h-3.5 w-3.5" />,
+                        whatsapp: <MessageSquare className="h-3.5 w-3.5" />,
+                        tarefa: <CheckSquare className="h-3.5 w-3.5" />,
+                        visita: <MapPin className="h-3.5 w-3.5" />,
+                        criacao: <User className="h-3.5 w-3.5" />,
+                      };
+                      const colors = {
+                        email: "bg-blue-500/20 text-blue-500",
+                        whatsapp: "bg-green-500/20 text-green-600",
+                        tarefa: ev.extra === "concluida" ? "bg-emerald-500/20 text-emerald-600" : "bg-orange-500/20 text-orange-500",
+                        visita: ev.extra === "realizada" ? "bg-emerald-500/20 text-emerald-600" : ev.extra === "cancelada" ? "bg-destructive/20 text-destructive" : "bg-primary/20 text-primary",
+                        criacao: "bg-purple-500/20 text-purple-500",
+                      };
+                      return (
+                        <div key={`${ev.id}-${idx}`} className="flex gap-3 pb-4 last:pb-0">
+                          <div className={`relative z-10 flex-shrink-0 h-7 w-7 rounded-full flex items-center justify-center ${colors[ev.type]}`}>
+                            {icons[ev.type]}
+                          </div>
+                          <div className="flex-1 min-w-0 pt-0.5">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-xs font-medium leading-tight">{ev.title}</p>
+                              <span className="text-[10px] text-muted-foreground shrink-0">
+                                {format(new Date(ev.date), "dd/MM HH:mm")}
+                              </span>
+                            </div>
+                            {ev.subtitle && (
+                              <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{ev.subtitle}</p>
+                            )}
+                          </div>
                         </div>
-                        {c.assunto && <p className="font-medium">{c.assunto}</p>}
-                        {c.conteudo && <p className="text-muted-foreground line-clamp-2">{c.conteudo}</p>}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </TabsContent>
