@@ -33,8 +33,16 @@ type Parcela = Tables<"parcelas">;
 type Recorrencia = Tables<"recorrencias">;
 type Custo = Tables<"custos">;
 
-function formatCurrency(v: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
+function formatCurrency(v: number | string) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v));
+}
+
+/** Converte string monetária possivelmente formatada em pt-BR para número */
+function parseMoney(v: string): number {
+  if (!v) return 0;
+  // Remove separadores de milhar (.) e converte vírgula decimal para ponto
+  const clean = v.replace(/\./g, "").replace(",", ".");
+  return parseFloat(clean) || 0;
 }
 
 const CATEGORIA_LABELS: Record<string, string> = {
@@ -857,9 +865,9 @@ function ComissoesTab() {
       imovel_id: form.imovel_id || null,
       corretor_id: form.corretor_id || null,
       tipo: form.tipo,
-      valor_imovel: form.valor_imovel ? parseFloat(form.valor_imovel) : null,
+      valor_imovel: form.valor_imovel ? parseMoney(form.valor_imovel) : null,
       percentual_comissao: parseFloat(form.percentual_comissao) || null,
-      valor_comissao: form.valor_comissao ? parseFloat(form.valor_comissao) : null,
+      valor_comissao: form.valor_comissao ? parseMoney(form.valor_comissao) : null,
       status: form.status,
       data_prevista: form.data_prevista || null,
       data_recebimento: form.data_recebimento || null,

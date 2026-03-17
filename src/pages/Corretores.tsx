@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useCorretores, Corretor } from "@/hooks/useCorretores";
+import { maskPhone } from "@/lib/masks";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -272,7 +273,7 @@ export default function Corretores() {
                 <Label>Telefone</Label>
                 <Input
                   value={form.telefone}
-                  onChange={(e) => setForm((f) => ({ ...f, telefone: e.target.value }))}
+                  onChange={(e) => setForm((f) => ({ ...f, telefone: maskPhone(e.target.value) }))}
                   placeholder="(11) 99999-9999"
                 />
               </div>
@@ -280,7 +281,7 @@ export default function Corretores() {
                 <Label>WhatsApp</Label>
                 <Input
                   value={form.whatsapp}
-                  onChange={(e) => setForm((f) => ({ ...f, whatsapp: e.target.value }))}
+                  onChange={(e) => setForm((f) => ({ ...f, whatsapp: maskPhone(e.target.value) }))}
                   placeholder="(11) 99999-9999"
                 />
               </div>

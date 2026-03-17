@@ -18,7 +18,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 
 function formatCurrency(val: number | null) {
   if (!val) return null;
-  return val.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(Number(val));
 }
 
 interface Props {

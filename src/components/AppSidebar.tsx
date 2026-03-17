@@ -1,11 +1,11 @@
 import {
-  LayoutDashboard, Users, FileText, DollarSign, LogOut, KeyRound,
+  LayoutDashboard, Users, FileText, DollarSign, LogOut,
   CheckSquare, DatabaseBackup, Webhook, BarChart2, Home, Calendar,
   UserCheck, Palette, Map, Building2, ChevronDown,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { supabase } from "@/integrations/supabase/client";
-import { useConfiguracoesSistema } from "@/hooks/useConfiguracoesSistema";
+import { usePlataforma } from "@/contexts/PlataformaContext";
 import {
   Sidebar,
   SidebarContent,
@@ -39,14 +39,13 @@ const mainItems = [
 
 const configItems = [
   { title: "Integrações", url: "/configuracoes/integracoes", icon: Webhook },
-  { title: "Credenciais", url: "/configuracoes/credenciais", icon: KeyRound },
   { title: "Aparência", url: "/configuracoes/aparencia", icon: Palette },
   { title: "Portais", url: "/configuracoes/portais", icon: Map },
   { title: "Backup", url: "/configuracoes/backup", icon: DatabaseBackup },
 ];
 
 export function AppSidebar() {
-  const { config } = useConfiguracoesSistema();
+  const { config } = usePlataforma();
   const [configOpen, setConfigOpen] = useState(false);
 
   const handleLogout = async () => {

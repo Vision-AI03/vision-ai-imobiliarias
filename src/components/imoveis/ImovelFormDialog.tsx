@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { maskCEP } from "@/lib/masks";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -163,7 +164,11 @@ export function ImovelFormDialog({ open, onOpenChange, imovel, onSaved }: Props)
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error("Não autenticado");
 
-      const n = (v: string) => (v ? parseFloat(v) : null);
+      const n = (v: string) => {
+        if (!v) return null;
+        const clean = v.replace(/\./g, "").replace(",", ".");
+        return parseFloat(clean) || null;
+      };
       const ni = (v: string) => (v ? parseInt(v) : null);
 
       const payload = {
@@ -434,7 +439,10 @@ export function ImovelFormDialog({ open, onOpenChange, imovel, onSaved }: Props)
                 <Label>CEP</Label>
                 <Input
                   value={form.cep}
-                  onChange={(e) => setForm((f) => ({ ...f, cep: e.target.value }))}
+                  onChange={(e) => {
+                    const masked = maskCEP(e.target.value);
+                    setForm((f) => ({ ...f, cep: masked }));
+                  }}
                   onBlur={(e) => buscarCep(e.target.value)}
                   placeholder="00000-000"
                 />

@@ -8,10 +8,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Upload, Save, Palette, Building2, Phone, Mail } from "lucide-react";
-import { useConfiguracoesSistema } from "@/hooks/useConfiguracoesSistema";
+import { usePlataforma } from "@/contexts/PlataformaContext";
+import { maskCNPJ, maskPhone } from "@/lib/masks";
 
 export default function Aparencia() {
-  const { config, loading, refetch } = useConfiguracoesSistema();
+  const { config, loading, refetch, updateConfig } = usePlataforma();
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -66,6 +67,7 @@ export default function Aparencia() {
 
       const { data: urlData } = supabase.storage.from("logos").getPublicUrl(path);
       setForm((f) => ({ ...f, logo_url: urlData.publicUrl }));
+      updateConfig({ logo_url: urlData.publicUrl });
       toast.success("Logo enviada com sucesso!");
     } catch (err) {
       toast.error("Erro ao fazer upload da logo.");
@@ -100,6 +102,15 @@ export default function Aparencia() {
 
       if (error) throw error;
 
+      updateConfig({
+        nome_plataforma: payload.nome_plataforma,
+        logo_url: payload.logo_url,
+        nome_imobiliaria: payload.nome_imobiliaria,
+        cnpj: payload.cnpj,
+        telefone_suporte: payload.telefone_suporte,
+        email_suporte: payload.email_suporte,
+        email_gestor: payload.email_gestor,
+      });
       toast.success("Configurações salvas com sucesso!");
       refetch();
     } catch (err) {
@@ -241,7 +252,7 @@ export default function Aparencia() {
             <Label>CNPJ</Label>
             <Input
               value={form.cnpj}
-              onChange={(e) => setForm((f) => ({ ...f, cnpj: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, cnpj: maskCNPJ(e.target.value) }))}
               placeholder="00.000.000/0001-00"
             />
           </div>
@@ -263,7 +274,7 @@ export default function Aparencia() {
               <Label>Telefone de Suporte</Label>
               <Input
                 value={form.telefone_suporte}
-                onChange={(e) => setForm((f) => ({ ...f, telefone_suporte: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, telefone_suporte: maskPhone(e.target.value) }))}
                 placeholder="(11) 99999-9999"
               />
             </div>
@@ -297,7 +308,7 @@ export default function Aparencia() {
             </Label>
             <Input
               value={form.telefone_gestor}
-              onChange={(e) => setForm((f) => ({ ...f, telefone_gestor: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, telefone_gestor: maskPhone(e.target.value) }))}
               placeholder="(11) 99999-9999"
             />
             <p className="text-xs text-muted-foreground">

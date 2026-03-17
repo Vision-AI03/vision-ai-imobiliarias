@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { maskPhone } from "@/lib/masks";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -127,7 +128,7 @@ export default function AddLeadDialog() {
             </div>
             <div className="space-y-1">
               <Label>Telefone / WhatsApp</Label>
-              <Input value={form.telefone} onChange={(e) => set("telefone", e.target.value)} placeholder="(11) 99999-9999" />
+              <Input value={form.telefone} onChange={(e) => set("telefone", maskPhone(e.target.value))} placeholder="(11) 99999-9999" />
             </div>
             <div className="space-y-1">
               <Label>Email</Label>
@@ -241,10 +242,10 @@ export default function AddLeadDialog() {
           {corretores.filter((c) => c.ativo).length > 0 && (
             <div className="space-y-1">
               <Label className="text-xs">Corretor Responsável</Label>
-              <Select value={form.corretor_responsavel} onValueChange={(v) => set("corretor_responsavel", v)}>
+              <Select value={form.corretor_responsavel || "__auto__"} onValueChange={(v) => set("corretor_responsavel", v === "__auto__" ? "" : v)}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Distribuir automaticamente" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Distribuir automaticamente</SelectItem>
+                  <SelectItem value="__auto__">Distribuir automaticamente</SelectItem>
                   {corretores.filter((c) => c.ativo).map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
                   ))}
