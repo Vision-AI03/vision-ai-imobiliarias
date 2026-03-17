@@ -33,7 +33,7 @@ export function useConfiguracoesSistema() {
 
   const fetchConfig = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return;
+    if (!userData.user) { setLoading(false); return; }
 
     const { data } = await supabase
       .from("configuracoes_sistema")

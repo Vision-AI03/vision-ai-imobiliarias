@@ -49,7 +49,7 @@ export default function Tarefas() {
 
   const fetchTarefas = useCallback(async () => {
     const { data: user } = await supabase.auth.getUser();
-    if (!user.user) return;
+    if (!user.user) { setLoading(false); return; }
 
     const { data } = await supabase
       .from("tarefas")

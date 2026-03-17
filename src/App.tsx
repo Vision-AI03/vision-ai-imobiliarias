@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,26 +7,26 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session } from "@supabase/supabase-js";
 import { AppLayout } from "@/components/AppLayout";
-import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import CRM from "./pages/CRM";
-import Comunicacoes from "./pages/Comunicacoes";
-import Contratos from "./pages/Contratos";
-import Financeiro from "./pages/Financeiro";
-import Credenciais from "./pages/Credenciais";
-import Integracoes from "./pages/Integracoes";
-import Tarefas from "./pages/Tarefas";
-import Backup from "./pages/Backup";
-import Notificacoes from "./pages/Notificacoes";
-import Relatorios from "./pages/Relatorios";
-import NotFound from "./pages/NotFound";
-// Novos módulos imobiliários
-import Imoveis from "./pages/Imoveis";
-import Agenda from "./pages/Agenda";
-import Corretores from "./pages/Corretores";
-import Aparencia from "./pages/Aparencia";
-import Portais from "./pages/Portais";
-import HotsiteCorretor from "./pages/HotsiteCorretor";
+
+const Auth = lazy(() => import("./pages/Auth"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const CRM = lazy(() => import("./pages/CRM"));
+const Comunicacoes = lazy(() => import("./pages/Comunicacoes"));
+const Contratos = lazy(() => import("./pages/Contratos"));
+const Financeiro = lazy(() => import("./pages/Financeiro"));
+const Credenciais = lazy(() => import("./pages/Credenciais"));
+const Integracoes = lazy(() => import("./pages/Integracoes"));
+const Tarefas = lazy(() => import("./pages/Tarefas"));
+const Backup = lazy(() => import("./pages/Backup"));
+const Notificacoes = lazy(() => import("./pages/Notificacoes"));
+const Relatorios = lazy(() => import("./pages/Relatorios"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Imoveis = lazy(() => import("./pages/Imoveis"));
+const Agenda = lazy(() => import("./pages/Agenda"));
+const Corretores = lazy(() => import("./pages/Corretores"));
+const Aparencia = lazy(() => import("./pages/Aparencia"));
+const Portais = lazy(() => import("./pages/Portais"));
+const HotsiteCorretor = lazy(() => import("./pages/HotsiteCorretor"));
 
 const queryClient = new QueryClient();
 
@@ -60,33 +60,39 @@ function AppRoutes() {
   // }
 
   return (
-    <Routes>
-      {/* Rotas públicas — sem autenticação */}
-      <Route path="/c/:slug" element={<HotsiteCorretor />} />
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-screen bg-background">
+        <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <Routes>
+        {/* Rotas públicas — sem autenticação */}
+        <Route path="/c/:slug" element={<HotsiteCorretor />} />
 
-      <Route element={<AppLayout />}>
-        {/* Core */}
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/crm" element={<CRM />} />
-        <Route path="/comunicacoes" element={<Comunicacoes />} />
-        <Route path="/contratos" element={<Contratos />} />
-        <Route path="/financeiro" element={<Financeiro />} />
-        <Route path="/tarefas" element={<Tarefas />} />
-        <Route path="/relatorios" element={<Relatorios />} />
-        <Route path="/notificacoes" element={<Notificacoes />} />
-        {/* Imobiliários novos */}
-        <Route path="/imoveis" element={<Imoveis />} />
-        <Route path="/agenda" element={<Agenda />} />
-        <Route path="/corretores" element={<Corretores />} />
-        {/* Configurações */}
-        <Route path="/configuracoes/credenciais" element={<Credenciais />} />
-        <Route path="/configuracoes/backup" element={<Backup />} />
-        <Route path="/configuracoes/integracoes" element={<Integracoes />} />
-        <Route path="/configuracoes/aparencia" element={<Aparencia />} />
-        <Route path="/configuracoes/portais" element={<Portais />} />
-      </Route>
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+        <Route element={<AppLayout />}>
+          {/* Core */}
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/crm" element={<CRM />} />
+          <Route path="/comunicacoes" element={<Comunicacoes />} />
+          <Route path="/contratos" element={<Contratos />} />
+          <Route path="/financeiro" element={<Financeiro />} />
+          <Route path="/tarefas" element={<Tarefas />} />
+          <Route path="/relatorios" element={<Relatorios />} />
+          <Route path="/notificacoes" element={<Notificacoes />} />
+          {/* Imobiliários novos */}
+          <Route path="/imoveis" element={<Imoveis />} />
+          <Route path="/agenda" element={<Agenda />} />
+          <Route path="/corretores" element={<Corretores />} />
+          {/* Configurações */}
+          <Route path="/configuracoes/credenciais" element={<Credenciais />} />
+          <Route path="/configuracoes/backup" element={<Backup />} />
+          <Route path="/configuracoes/integracoes" element={<Integracoes />} />
+          <Route path="/configuracoes/aparencia" element={<Aparencia />} />
+          <Route path="/configuracoes/portais" element={<Portais />} />
+        </Route>
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
   );
 }
 

@@ -358,17 +358,16 @@ export default function Financeiro() {
         <TabsList className="bg-secondary/50">
           <TabsTrigger value="empresa" className="gap-1.5"><Building2 className="h-4 w-4" />Imobiliária</TabsTrigger>
           <TabsTrigger value="comissoes" className="gap-1.5"><DollarSign className="h-4 w-4" />Comissões</TabsTrigger>
-          <TabsTrigger value="pessoal" className="gap-1.5"><User className="h-4 w-4" />Pessoal</TabsTrigger>
         </TabsList>
 
         {/* ============= VISION AI TAB ============= */}
         <TabsContent value="empresa" className="space-y-6">
           {/* Summary cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <SummaryCard icon={<DollarSign className="h-5 w-5" />} title="Receita Total" value={formatCurrency(receitaTotal)} subtitle={`Dev: ${formatCurrency(receitaDev)} + MRR: ${formatCurrency(mrrAtual)}`} accent="text-primary" />
+            <SummaryCard icon={<DollarSign className="h-5 w-5" />} title="Receita Total" value={formatCurrency(receitaTotal)} subtitle={`Vendas: ${formatCurrency(receitaDev)} + Aluguéis: ${formatCurrency(mrrAtual)}`} accent="text-primary" />
             <SummaryCard icon={<TrendingDown className="h-5 w-5" />} title="Custos do Mês" value={formatCurrency(totalCustosEmpresaMes)} subtitle={`${custosEmpresa.filter(c => c.ativo).length} custos ativos`} accent="text-destructive" />
             <SummaryCard icon={margemLiquida >= 0 ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownRight className="h-5 w-5" />} title="Margem Líquida" value={formatCurrency(margemLiquida)} subtitle={`${margemPct}% da receita`} accent={margemLiquida >= 0 ? "text-primary" : "text-destructive"} />
-            <SummaryCard icon={<TrendingUp className="h-5 w-5" />} title="MRR Atual" value={formatCurrency(mrrAtual)} subtitle={`${recorrencias.filter(r => r.ativo).length} contratos ativos`} accent="text-accent" />
+            <SummaryCard icon={<TrendingUp className="h-5 w-5" />} title="Comissões do Mês" value={formatCurrency(mrrAtual)} subtitle={`${recorrencias.filter(r => r.ativo).length} transações fechadas`} accent="text-accent" />
           </div>
 
           {/* Metas */}
@@ -388,7 +387,7 @@ export default function Financeiro() {
                         <Input type="number" value={editMetaFat} onChange={e => setEditMetaFat(e.target.value)} placeholder="50000" />
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-xs">Meta de MRR (R$)</Label>
+                        <Label className="text-xs">Meta de Comissões (R$)</Label>
                         <Input type="number" value={editMetaMrr} onChange={e => setEditMetaMrr(e.target.value)} placeholder="20000" />
                       </div>
                       <div className="flex justify-end gap-2">
@@ -418,7 +417,7 @@ export default function Financeiro() {
             </Card>
             <Card className="glass-card">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2"><Target className="h-4 w-4 text-accent" />Meta de MRR</CardTitle>
+                <CardTitle className="text-sm flex items-center gap-2"><Target className="h-4 w-4 text-accent" />Meta de Comissões</CardTitle>
               </CardHeader>
               <CardContent>
                 {metaMRR > 0 ? (
@@ -466,8 +465,8 @@ export default function Financeiro() {
           <Tabs defaultValue="resumo" className="space-y-4">
             <TabsList className="bg-secondary/50">
               <TabsTrigger value="resumo" className="gap-1.5"><BarChart3 className="h-4 w-4" />Resumo</TabsTrigger>
-              <TabsTrigger value="desenvolvimento" className="gap-1.5"><DollarSign className="h-4 w-4" />Desenvolvimento</TabsTrigger>
-              <TabsTrigger value="mrr" className="gap-1.5"><TrendingUp className="h-4 w-4" />MRR</TabsTrigger>
+              <TabsTrigger value="desenvolvimento" className="gap-1.5"><DollarSign className="h-4 w-4" />Vendas</TabsTrigger>
+              <TabsTrigger value="mrr" className="gap-1.5"><TrendingUp className="h-4 w-4" />Recorrências</TabsTrigger>
               <TabsTrigger value="custos" className="gap-1.5"><TrendingDown className="h-4 w-4" />Custos Fixos</TabsTrigger>
             </TabsList>
 
@@ -482,8 +481,8 @@ export default function Financeiro() {
                       <YAxis tick={{ fill: "hsl(0 0% 55%)", fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} />
                       <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatCurrency(v)} />
                       <Legend wrapperStyle={{ color: "hsl(0 0% 55%)" }} />
-                      <Bar dataKey="desenvolvimento" name="Desenvolvimento" fill="hsl(252 100% 64%)" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="recorrente" name="Recorrente" fill="hsl(187 100% 50%)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="desenvolvimento" name="Vendas" fill="hsl(252 100% 64%)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="recorrente" name="Aluguéis" fill="hsl(187 100% 50%)" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="custos" name="Custos" fill="hsl(0 72% 51%)" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -507,7 +506,7 @@ export default function Financeiro() {
 
             <TabsContent value="desenvolvimento" className="space-y-4">
               <Card className="glass-card">
-                <CardHeader><CardTitle className="text-sm">Receita de Desenvolvimento por Mês</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-sm">Receita de Vendas por Mês</CardTitle></CardHeader>
                 <CardContent className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={monthlyData}>
@@ -515,7 +514,7 @@ export default function Financeiro() {
                       <XAxis dataKey="mes" tick={{ fill: "hsl(0 0% 55%)", fontSize: 12 }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fill: "hsl(0 0% 55%)", fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} />
                       <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatCurrency(v)} />
-                      <Bar dataKey="desenvolvimento" name="Desenvolvimento" fill="url(#gradDev)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="desenvolvimento" name="Vendas" fill="url(#gradDev)" radius={[4, 4, 0, 0]} />
                       <defs><linearGradient id="gradDev" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="hsl(252 100% 64%)" /><stop offset="100%" stopColor="hsl(187 100% 50%)" /></linearGradient></defs>
                     </BarChart>
                   </ResponsiveContainer>
@@ -548,12 +547,12 @@ export default function Financeiro() {
 
             <TabsContent value="mrr" className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Card className="glass-card"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">MRR Atual</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold text-accent">{formatCurrency(mrrAtual)}</p></CardContent></Card>
+                <Card className="glass-card"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Comissões do Mês</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold text-accent">{formatCurrency(mrrAtual)}</p></CardContent></Card>
                 <Card className="glass-card"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Contratos Ativos</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{recorrencias.filter(r => r.ativo).length}</p></CardContent></Card>
                 <Card className="glass-card"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Churn</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold text-destructive">{contratosChurn}</p></CardContent></Card>
               </div>
               <Card className="glass-card">
-                <CardHeader><CardTitle className="text-sm">Evolução do MRR</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-sm">Evolução das Comissões</CardTitle></CardHeader>
                 <CardContent className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={mrrData}>
@@ -561,7 +560,7 @@ export default function Financeiro() {
                       <XAxis dataKey="mes" tick={{ fill: "hsl(0 0% 55%)", fontSize: 12 }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fill: "hsl(0 0% 55%)", fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} />
                       <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatCurrency(v)} />
-                      <Line type="monotone" dataKey="mrr" name="MRR" stroke="hsl(187 100% 50%)" strokeWidth={2} dot={{ fill: "hsl(187 100% 50%)", r: 4 }} />
+                      <Line type="monotone" dataKey="mrr" name="Comissões" stroke="hsl(187 100% 50%)" strokeWidth={2} dot={{ fill: "hsl(187 100% 50%)", r: 4 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -600,122 +599,6 @@ export default function Financeiro() {
           <ComissoesTab />
         </TabsContent>
 
-        {/* ============= PESSOAL TAB ============= */}
-        <TabsContent value="pessoal" className="space-y-6">
-          <Tabs defaultValue="contas" className="space-y-4">
-            <TabsList className="bg-secondary/50">
-              <TabsTrigger value="contas" className="gap-1.5"><DollarSign className="h-4 w-4" />Contas a Pagar</TabsTrigger>
-              <TabsTrigger value="custos-pessoais" className="gap-1.5"><TrendingDown className="h-4 w-4" />Custos Fixos</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="contas" className="space-y-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
-                  <SelectTrigger className="w-[160px]"><Filter className="h-3 w-3 mr-1" /><SelectValue placeholder="Categoria" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todas</SelectItem>
-                    {CATEGORIAS_DESPESA.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={filtroMetodo} onValueChange={setFiltroMetodo}>
-                  <SelectTrigger className="w-[160px]"><SelectValue placeholder="Método" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    {METODOS_PAGAMENTO.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <div className="flex-1" />
-                <Dialog open={novaTransOpen} onOpenChange={setNovaTransOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="gradient-primary text-primary-foreground gap-1.5"><Plus className="h-4 w-4" />Nova Conta</Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md bg-card border-border">
-                    <DialogHeader><DialogTitle>Nova Conta / Despesa</DialogTitle></DialogHeader>
-                    <div className="space-y-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Categoria *</Label>
-                        <Input value={transCategoria} onChange={e => setTransCategoria(e.target.value)} placeholder="Ex: Aluguel, Internet, Luz" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Descrição *</Label>
-                        <Input value={transDescricao} onChange={e => setTransDescricao(e.target.value)} placeholder="Ex: Conta de luz" />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <Label className="text-xs">Valor *</Label>
-                          <Input type="number" value={transValor} onChange={e => setTransValor(e.target.value)} placeholder="99.90" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs">Data</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !transData && "text-muted-foreground")}>
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {transData ? format(transData, "dd/MM/yyyy") : "Selecione"}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar mode="single" selected={transData} onSelect={(d) => d && setTransData(d)} initialFocus className={cn("p-3 pointer-events-auto")} />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Método de Pagamento</Label>
-                        <Select value={transMetodo} onValueChange={setTransMetodo}>
-                          <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                          <SelectContent>{METODOS_PAGAMENTO.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Switch checked={transRecorrente} onCheckedChange={setTransRecorrente} />
-                        <Label className="text-xs">Recorrente</Label>
-                        {transRecorrente && <Input type="number" className="w-20" placeholder="Dia" value={transDiaRecorrencia} onChange={e => setTransDiaRecorrencia(e.target.value)} />}
-                      </div>
-                      <div className="flex justify-end gap-2 pt-2">
-                        <Button variant="outline" onClick={() => setNovaTransOpen(false)}>Cancelar</Button>
-                        <Button onClick={() => { setTransTipo("despesa"); handleSalvarTransacao(); }} disabled={transSaving} className="gradient-primary text-primary-foreground">{transSaving ? "Salvando..." : "Salvar"}</Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
-
-              {transacoesFiltradas.length === 0 ? (
-                <Card className="glass-card"><CardContent className="py-8 text-center text-muted-foreground text-sm">Nenhuma conta encontrada.</CardContent></Card>
-              ) : (
-                <Card className="glass-card overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow><TableHead>Data</TableHead><TableHead>Descrição</TableHead><TableHead>Categoria</TableHead><TableHead>Método</TableHead><TableHead className="text-right">Valor</TableHead></TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {transacoesFiltradas.slice(0, 50).map(t => (
-                        <TableRow key={t.id}>
-                          <TableCell className="text-xs">{format(new Date(t.data + "T00:00:00"), "dd/MM/yy")}</TableCell>
-                          <TableCell className="text-sm font-medium">{t.descricao}</TableCell>
-                          <TableCell><Badge variant="outline" className="text-[10px]">{t.categoria}</Badge></TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{t.metodo_pagamento || "—"}</TableCell>
-                          <TableCell className="text-right font-bold text-sm text-destructive">
-                            -{formatCurrency(Number(t.valor))}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </Card>
-              )}
-            </TabsContent>
-
-            <TabsContent value="custos-pessoais" className="space-y-4">
-              <CustosSection custos={custosPessoais} totalCusto={totalCustosPessoaisMes} novoCustoOpen={novoCustoOpen} setNovoCustoOpen={setNovoCustoOpen}
-                custoNome={custoNome} setCustoNome={setCustoNome} custoCategoria={custoCategoria} setCustoCategoria={setCustoCategoria}
-                custoValor={custoValor} setCustoValor={setCustoValor} custoRenovacao={custoRenovacao} setCustoRenovacao={setCustoRenovacao}
-                saving={saving} handleSalvarCusto={() => { setCustoEscopo("pessoal"); handleSalvarCusto(); }} toggleCusto={toggleCusto}
-                handleExcluirCusto={handleExcluirCusto} handleEditarCusto={handleEditarCusto} escopo="pessoal" />
-            </TabsContent>
-          </Tabs>
-        </TabsContent>
       </Tabs>
     </div>
   );
@@ -930,7 +813,7 @@ function ComissoesTab() {
   async function fetchAll() {
     setLoading(true);
     const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return;
+    if (!userData.user) { setLoading(false); return; }
 
     const [c, cor, imov, lds] = await Promise.all([
       supabase.from("comissoes").select("*, corretor:corretores(nome), imovel:imoveis(titulo, tipo, endereco), lead:leads(nome)").eq("user_id", userData.user.id).order("created_at", { ascending: false }),

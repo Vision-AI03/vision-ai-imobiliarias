@@ -270,7 +270,7 @@ export default function Agenda() {
             {visitasHoje.map((v) => (
               <div key={v.id} className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">{v.hora_visita.slice(0, 5)}</span>
+                  <span className="font-medium">{v.hora_visita?.slice(0, 5) ?? "--:--"}</span>
                   <span>{v.lead?.nome || "Lead não vinculado"}</span>
                   {v.imovel && (
                     <span className="text-muted-foreground text-xs">
@@ -359,7 +359,7 @@ export default function Agenda() {
                           key={v.id}
                           className={`text-[10px] px-1 py-0.5 rounded truncate ${STATUS_CONFIG[v.status]?.color || "bg-blue-500/15 text-blue-600"}`}
                         >
-                          {v.hora_visita.slice(0, 5)} {v.lead?.nome?.split(" ")[0] || "Visita"}
+                          {v.hora_visita?.slice(0, 5) ?? "--:--"} {v.lead?.nome?.split(" ")[0] || "Visita"}
                         </div>
                       ))}
                       {dayVisitas.length > 3 && (
@@ -584,7 +584,7 @@ function VisitaCard({ visita, onFeedback }: { visita: Visita; onFeedback: () => 
   return (
     <div className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors">
       <div className="flex flex-col items-center">
-        <span className="font-semibold text-sm">{visita.hora_visita.slice(0, 5)}</span>
+        <span className="font-semibold text-sm">{visita.hora_visita?.slice(0, 5) ?? "--:--"}</span>
         <span className="text-xs text-muted-foreground">{visita.duracao_minutos}min</span>
       </div>
 

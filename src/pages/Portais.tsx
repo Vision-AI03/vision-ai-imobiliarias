@@ -99,7 +99,16 @@ export default function Portais() {
   async function init() {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      // Inicializa configs com defaults para evitar crash no render
+      const map: Record<string, ConfigPortal> = {};
+      for (const p of PORTAIS_SUPORTADOS) {
+        map[p.key] = { portal: p.key, ativo: false, total_leads_importados: 0 };
+      }
+      setConfigs(map);
+      setLoading(false);
+      return;
+    }
     setUserId(user.id);
 
     // Extract project ref from Supabase URL for webhook display
