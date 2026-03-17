@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface Imovel {
@@ -45,8 +46,6 @@ export interface Imovel {
   visitas_count: number;
   created_at: string;
   updated_at: string;
-  // join
-  corretor?: { nome: string; telefone: string | null } | null;
 }
 
 export interface ImovelFilters {
@@ -66,7 +65,7 @@ async function fetchImoveis(filters?: ImovelFilters): Promise<Imovel[]> {
 
   let query = supabase
     .from("imoveis")
-    .select("*, corretor:corretores(nome, telefone)")
+    .select("*")
     .eq("user_id", userData.user.id)
     .order("created_at", { ascending: false });
 
@@ -90,11 +89,23 @@ async function fetchImoveis(filters?: ImovelFilters): Promise<Imovel[]> {
 export function useImoveis(filters?: ImovelFilters) {
   const queryClient = useQueryClient();
   const filterKey = JSON.stringify(filters || {});
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["imoveis", filterKey],
+    queryKey: ["imoveis", userId, filterKey],
     queryFn: () => fetchImoveis(filters),
-    staleTime: 3 * 60 * 1000, // 3 minutes
+    enabled: !!userId,
+    staleTime: 3 * 60 * 1000,
   });
 
   return {
