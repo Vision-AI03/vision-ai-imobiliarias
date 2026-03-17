@@ -800,6 +800,7 @@ function ComissoesTab() {
   const [editId, setEditId] = useState<string | null>(null);
   const [filtroCorretor, setFiltroCorretor] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
   const [form, setForm] = useState({
     lead_id: "", imovel_id: "", corretor_id: "", tipo: "venda",
     valor_imovel: "", percentual_comissao: "6", valor_comissao: "",
@@ -807,8 +808,19 @@ function ComissoesTab() {
   });
 
   useEffect(() => {
-    fetchAll();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (userId) fetchAll();
+    else setLoading(false);
+  }, [userId]);
 
   async function fetchAll() {
     setLoading(true);

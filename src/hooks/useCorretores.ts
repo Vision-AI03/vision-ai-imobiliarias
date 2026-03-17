@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface Corretor {
@@ -36,10 +37,23 @@ async function fetchCorretores(): Promise<Corretor[]> {
 
 export function useCorretores() {
   const queryClient = useQueryClient();
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   const { data, isLoading } = useQuery({
-    queryKey: ["corretores"],
+    queryKey: ["corretores", userId],
     queryFn: fetchCorretores,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!userId,
+    staleTime: 5 * 60 * 1000,
   });
 
   return {

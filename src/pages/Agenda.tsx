@@ -64,7 +64,18 @@ export default function Agenda() {
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [editingVisita, setEditingVisita] = useState<Visita | null>(null);
   const [saving, setSaving] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const { corretores } = useCorretores();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Leads for autocomplete
   const [leads, setLeads] = useState<{ id: string; nome: string; telefone: string | null }[]>([]);
@@ -88,6 +99,7 @@ export default function Agenda() {
   });
 
   const fetchVisitas = useCallback(async () => {
+    if (!userId) { setLoading(false); return; }
     setLoading(true);
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) { setLoading(false); return; }
@@ -106,27 +118,24 @@ export default function Agenda() {
 
     setVisitas((data as unknown as Visita[]) || []);
     setLoading(false);
-  }, [currentMonth]);
+  }, [currentMonth, userId]);
 
   useEffect(() => {
     fetchVisitas();
   }, [fetchVisitas]);
 
   useEffect(() => {
+    if (!userId) return;
     const fetchLeadsImoveis = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return;
-
       const [{ data: leadsData }, { data: imoveisData }] = await Promise.all([
         supabase.from("leads").select("id, nome, telefone").order("nome").limit(200),
-        supabase.from("imoveis").select("id, titulo, endereco, tipo").eq("user_id", userData.user.id).eq("status", "disponivel").order("created_at", { ascending: false }).limit(200),
+        supabase.from("imoveis").select("id, titulo, endereco, tipo").eq("user_id", userId).eq("status", "disponivel").order("created_at", { ascending: false }).limit(200),
       ]);
-
       setLeads((leadsData as any) || []);
       setImoveis((imoveisData as any) || []);
     };
     fetchLeadsImoveis();
-  }, []);
+  }, [userId]);
 
   const openCreate = (day?: Date) => {
     setEditingVisita(null);
