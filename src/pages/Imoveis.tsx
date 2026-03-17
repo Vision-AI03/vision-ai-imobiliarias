@@ -266,12 +266,12 @@ export default function Imoveis() {
                   <CompareRow label="Andar" value={(im as any).andar != null ? `${(im as any).andar}º` : null} />
                   <CompareRow
                     label="Valor Venda"
-                    value={im.valor_venda != null ? im.valor_venda.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }) : null}
+                    value={im.valor_venda != null ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(im.valor_venda)) : null}
                     highlight
                   />
                   <CompareRow
                     label="Valor Aluguel"
-                    value={im.valor_aluguel != null ? `${im.valor_aluguel.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })}/mês` : null}
+                    value={im.valor_aluguel != null ? `${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(im.valor_aluguel))}/mês` : null}
                     highlight
                   />
                   <CompareRow label="Condomínio" value={(im as any).valor_condominio != null ? `R$ ${(im as any).valor_condominio?.toLocaleString("pt-BR")}` : null} />
@@ -322,12 +322,23 @@ function ImovelListView({ imoveis, onEdit }: { imoveis: Imovel[]; onEdit: (i: Im
                 <p className="text-xs text-muted-foreground">{imovel.bairro || "—"}{imovel.cidade ? `, ${imovel.cidade}` : ""}</p>
               </td>
               <td className="px-4 py-3 text-xs">{imovel.finalidade}</td>
-              <td className="px-4 py-3 font-semibold text-primary text-xs">
-                {imovel.valor_venda
-                  ? imovel.valor_venda.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })
-                  : imovel.valor_aluguel
-                  ? `${imovel.valor_aluguel.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })}/mês`
-                  : "Consultar"}
+              <td className="px-4 py-3 text-xs">
+                {(() => {
+                  const fmt = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v));
+                  const fin = imovel.finalidade;
+                  const showVenda = fin === "Venda" || fin === "Venda e Aluguel";
+                  const showAluguel = fin === "Aluguel" || fin === "Venda e Aluguel" || fin === "Temporada";
+                  const ambos = showVenda && showAluguel && imovel.valor_venda && imovel.valor_aluguel;
+                  if (ambos) return (
+                    <span className="flex flex-col gap-0.5">
+                      <span className="font-semibold text-primary">{fmt(imovel.valor_venda!)}</span>
+                      <span className="text-blue-600">{fmt(imovel.valor_aluguel!)}/mês</span>
+                    </span>
+                  );
+                  if (showVenda && imovel.valor_venda) return <span className="font-semibold text-primary">{fmt(imovel.valor_venda)}</span>;
+                  if (showAluguel && imovel.valor_aluguel) return <span className="font-semibold text-blue-600">{fmt(imovel.valor_aluguel)}/mês</span>;
+                  return <span className="text-muted-foreground">Consultar</span>;
+                })()}
               </td>
               <td className="px-4 py-3">
                 <Badge variant="outline" className="text-xs">

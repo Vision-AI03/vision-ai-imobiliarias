@@ -16,9 +16,9 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   inativo: { label: "Inativo", className: "bg-gray-200 text-gray-500 border-gray-300" },
 };
 
-function formatCurrency(val: number | null) {
+function formatCurrency(val: number | null | undefined) {
   if (!val) return null;
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(Number(val));
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(val));
 }
 
 interface Props {
@@ -31,11 +31,9 @@ export function ImovelCard({ imovel, onEdit }: Props) {
   const [calcOpen, setCalcOpen] = useState(false);
   const status = statusConfig[imovel.status] || statusConfig.inativo;
 
-  const valor = imovel.valor_venda
-    ? formatCurrency(imovel.valor_venda)
-    : imovel.valor_aluguel
-    ? `${formatCurrency(imovel.valor_aluguel)}/mês`
-    : "Consultar";
+  const showVenda = imovel.finalidade === "Venda" || imovel.finalidade === "Venda e Aluguel";
+  const showAluguel = imovel.finalidade === "Aluguel" || imovel.finalidade === "Venda e Aluguel" || imovel.finalidade === "Temporada";
+  const ambos = showVenda && showAluguel && imovel.valor_venda && imovel.valor_aluguel;
 
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow group">
@@ -121,7 +119,20 @@ export function ImovelCard({ imovel, onEdit }: Props) {
         )}
 
         <div className="flex items-center justify-between pt-1 border-t">
-          <p className="font-bold text-sm text-primary">{valor}</p>
+          <div className="flex flex-col">
+            {ambos ? (
+              <>
+                <span className="text-[11px] text-muted-foreground">Venda: <span className="font-bold text-primary">{formatCurrency(imovel.valor_venda)}</span></span>
+                <span className="text-[11px] text-muted-foreground">Aluguel: <span className="font-semibold text-blue-600">{formatCurrency(imovel.valor_aluguel)}/mês</span></span>
+              </>
+            ) : showVenda && imovel.valor_venda ? (
+              <p className="font-bold text-sm text-primary">{formatCurrency(imovel.valor_venda)}</p>
+            ) : showAluguel && imovel.valor_aluguel ? (
+              <p className="font-bold text-sm text-blue-600">{formatCurrency(imovel.valor_aluguel)}<span className="text-xs font-normal">/mês</span></p>
+            ) : (
+              <p className="font-bold text-sm text-muted-foreground">Consultar</p>
+            )}
+          </div>
           <div className="flex gap-1">
             {imovel.valor_venda && (
               <Button
