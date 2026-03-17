@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import {
   DollarSign, TrendingUp, TrendingDown, Plus, BarChart3, ArrowUpRight, ArrowDownRight,
-  Building2, User, CalendarIcon, Filter, Wallet, PieChart, Pencil, Trash2, Target,
+  Building2, User, CalendarIcon, Filter, Wallet, PieChart, Pencil, Trash2, Target, CheckCircle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, subMonths, differenceInMonths } from "date-fns";
@@ -809,6 +809,9 @@ function ComissoesTab() {
   const [filtroCorretor, setFiltroCorretor] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [marcarId, setMarcarId] = useState<string | null>(null);
+  const [marcarData, setMarcarData] = useState("");
   const [form, setForm] = useState({
     lead_id: "", imovel_id: "", corretor_id: "", tipo: "venda",
     valor_imovel: "", percentual_comissao: "6", valor_comissao: "",
@@ -838,7 +841,7 @@ function ComissoesTab() {
     const [c, cor, imov, lds] = await Promise.all([
       supabase.from("comissoes").select("*, corretor:corretores(nome), imovel:imoveis(titulo, tipo, endereco), lead:leads(nome)").eq("user_id", userData.user.id).order("created_at", { ascending: false }),
       supabase.from("corretores").select("id, nome").eq("admin_id", userData.user.id).eq("ativo", true).order("nome"),
-      supabase.from("imoveis").select("id, titulo, tipo, endereco").eq("user_id", userData.user.id).order("created_at", { ascending: false }).limit(100),
+      supabase.from("imoveis").select("id, titulo, tipo, endereco, valor_venda, valor_aluguel").eq("user_id", userData.user.id).order("created_at", { ascending: false }).limit(100),
       supabase.from("leads").select("id, nome").order("nome").limit(200),
     ]);
 
@@ -889,6 +892,34 @@ function ComissoesTab() {
       setEditId(null);
       fetchAll();
     }
+  }
+
+  async function handleDelete() {
+    if (!deleteId) return;
+    const { error } = await supabase.from("comissoes").delete().eq("id", deleteId);
+    if (error) {
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Comissão excluída." });
+      setComissoes(prev => prev.filter(c => c.id !== deleteId));
+    }
+    setDeleteId(null);
+  }
+
+  async function handleMarcarRecebida() {
+    if (!marcarId) return;
+    const { error } = await supabase.from("comissoes").update({
+      status: "recebida",
+      data_recebimento: marcarData || null,
+    }).eq("id", marcarId);
+    if (error) {
+      toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Comissão marcada como recebida!" });
+      setComissoes(prev => prev.map(c => c.id === marcarId ? { ...c, status: "recebida", data_recebimento: marcarData || null } : c));
+    }
+    setMarcarId(null);
+    setMarcarData("");
   }
 
   const filtered = comissoes.filter(c => {
@@ -1017,13 +1048,23 @@ function ComissoesTab() {
                   </td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{c.data_prevista ? format(new Date(c.data_prevista), "dd/MM/yyyy") : "—"}</td>
                   <td className="px-4 py-3">
-                    <Button variant="ghost" size="sm" onClick={() => {
-                      setEditId(c.id);
-                      setForm({ lead_id: c.lead_id || "", imovel_id: c.imovel_id || "", corretor_id: c.corretor_id || "", tipo: c.tipo, valor_imovel: c.valor_imovel?.toString() || "", percentual_comissao: c.percentual_comissao?.toString() || "6", valor_comissao: c.valor_comissao?.toString() || "", status: c.status, data_prevista: c.data_prevista || "", data_recebimento: c.data_recebimento || "", observacoes: c.observacoes || "" });
-                      setDialogOpen(true);
-                    }}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      {c.status === "a_receber" && (
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" title="Marcar como Recebida" onClick={() => { setMarcarId(c.id); setMarcarData(new Date().toISOString().slice(0, 10)); }}>
+                          <CheckCircle className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => {
+                        setEditId(c.id);
+                        setForm({ lead_id: c.lead_id || "", imovel_id: c.imovel_id || "", corretor_id: c.corretor_id || "", tipo: c.tipo, valor_imovel: c.valor_imovel?.toString() || "", percentual_comissao: c.percentual_comissao?.toString() || "6", valor_comissao: c.valor_comissao?.toString() || "", status: c.status, data_prevista: c.data_prevista || "", data_recebimento: c.data_recebimento || "", observacoes: c.observacoes || "" });
+                        setDialogOpen(true);
+                      }}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10" title="Excluir" onClick={() => setDeleteId(c.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1031,6 +1072,39 @@ function ComissoesTab() {
           </table>
         </div>
       </Card>
+
+      {/* Confirmar exclusão */}
+      <AlertDialog open={!!deleteId} onOpenChange={open => { if (!open) setDeleteId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir comissão?</AlertDialogTitle>
+            <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={handleDelete}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Marcar como Recebida */}
+      <Dialog open={!!marcarId} onOpenChange={open => { if (!open) { setMarcarId(null); setMarcarData(""); } }}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader><DialogTitle>Marcar como Recebida</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Data de Recebimento</Label>
+              <Input type="date" value={marcarData} onChange={e => setMarcarData(e.target.value)} className="h-8 text-xs" />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => { setMarcarId(null); setMarcarData(""); }}>Cancelar</Button>
+            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleMarcarRecebida}>
+              <CheckCircle className="h-4 w-4 mr-1" />Confirmar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog comissão */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -1062,7 +1136,14 @@ function ComissoesTab() {
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Imóvel</Label>
-              <Select value={form.imovel_id || "__none__"} onValueChange={v => setForm(f => ({ ...f, imovel_id: v === "__none__" ? "" : v }))}>
+              <Select value={form.imovel_id || "__none__"} onValueChange={v => {
+                const imovelId = v === "__none__" ? "" : v;
+                const imovel = imoveis.find(i => i.id === imovelId);
+                const autoValor = imovel ? (imovel.valor_venda || imovel.valor_aluguel || "") : "";
+                const valorStr = autoValor ? autoValor.toString() : "";
+                const comissao = valorStr ? calcComissao(valorStr, form.percentual_comissao) : form.valor_comissao;
+                setForm(f => ({ ...f, imovel_id: imovelId, valor_imovel: valorStr || f.valor_imovel, valor_comissao: valorStr ? comissao : f.valor_comissao }));
+              }}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">Sem imóvel</SelectItem>

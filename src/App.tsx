@@ -28,6 +28,7 @@ const Corretores = lazy(() => import("./pages/Corretores"));
 const Aparencia = lazy(() => import("./pages/Aparencia"));
 const Portais = lazy(() => import("./pages/Portais"));
 const HotsiteCorretor = lazy(() => import("./pages/HotsiteCorretor"));
+const Simulador = lazy(() => import("./pages/Simulador"));
 
 const queryClient = new QueryClient();
 
@@ -76,6 +77,7 @@ function AppRoutes() {
           <Route path="/comunicacoes" element={<Comunicacoes />} />
           <Route path="/contratos" element={<Contratos />} />
           <Route path="/financeiro" element={<Financeiro />} />
+          <Route path="/simulador" element={<Simulador />} />
           <Route path="/tarefas" element={<Tarefas />} />
           <Route path="/relatorios" element={<Relatorios />} />
           <Route path="/notificacoes" element={<Notificacoes />} />

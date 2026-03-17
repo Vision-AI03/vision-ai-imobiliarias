@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Users, FileText, DollarSign, LogOut,
   CheckSquare, DatabaseBackup, Webhook, BarChart2, Home, Calendar,
-  UserCheck, Palette, Map, Building2, ChevronDown,
+  UserCheck, Palette, Map, Building2, ChevronDown, Calculator,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,6 +33,7 @@ const mainItems = [
   { title: "Corretores", url: "/corretores", icon: UserCheck },
   { title: "Contratos", url: "/contratos", icon: FileText },
   { title: "Financeiro", url: "/financeiro", icon: DollarSign },
+  { title: "Simulador", url: "/simulador", icon: Calculator },
   { title: "Relatórios", url: "/relatorios", icon: BarChart2 },
   { title: "Tarefas", url: "/tarefas", icon: CheckSquare },
 ];
