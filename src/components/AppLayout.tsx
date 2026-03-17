@@ -4,8 +4,10 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { NotificationBell } from "@/components/NotificationBell";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Search } from "lucide-react";
+import { useVisitaNotifications } from "@/hooks/useVisitaNotifications";
 
 export function AppLayout() {
+  useVisitaNotifications();
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">

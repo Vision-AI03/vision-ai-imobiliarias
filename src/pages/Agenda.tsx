@@ -17,7 +17,18 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, ChevronLeft, ChevronRight, Plus, MapPin, User, Clock, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Plus, MapPin, User, Clock, CheckCircle2, XCircle, AlertCircle, Pencil, Trash2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useCorretores } from "@/hooks/useCorretores";
 
 interface Visita {
@@ -66,6 +77,10 @@ export default function Agenda() {
   const [saving, setSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const { corretores } = useCorretores();
+
+  // Edit & delete state
+  const [editVisitaId, setEditVisitaId] = useState<string | null>(null);
+  const [deleteVisitaId, setDeleteVisitaId] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -138,7 +153,7 @@ export default function Agenda() {
   }, [userId]);
 
   const openCreate = (day?: Date) => {
-    setEditingVisita(null);
+    setEditVisitaId(null);
     setForm({
       lead_id: "",
       imovel_id: "",
@@ -148,6 +163,21 @@ export default function Agenda() {
       duracao_minutos: "60",
       tipo: "presencial",
       observacoes: "",
+    });
+    setDialogOpen(true);
+  };
+
+  const openEdit = (visita: Visita) => {
+    setEditVisitaId(visita.id);
+    setForm({
+      lead_id: visita.lead_id || "",
+      imovel_id: visita.imovel_id || "",
+      corretor_id: visita.corretor_id || "",
+      data_visita: visita.data_visita,
+      hora_visita: visita.hora_visita?.slice(0, 5) || "",
+      duracao_minutos: String(visita.duracao_minutos || 60),
+      tipo: visita.tipo || "presencial",
+      observacoes: visita.observacoes || "",
     });
     setDialogOpen(true);
   };
@@ -162,8 +192,7 @@ export default function Agenda() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error("Não autenticado");
 
-      const payload = {
-        user_id: userData.user.id,
+      const editPayload = {
         lead_id: form.lead_id || null,
         imovel_id: form.imovel_id || null,
         corretor_id: form.corretor_id || null,
@@ -172,12 +201,27 @@ export default function Agenda() {
         duracao_minutos: parseInt(form.duracao_minutos) || 60,
         tipo: form.tipo,
         observacoes: form.observacoes || null,
-        status: "agendada",
       };
 
-      const { error } = await supabase.from("agenda_visitas").insert(payload);
-      if (error) throw error;
-      toast.success("Visita agendada!");
+      if (editVisitaId) {
+        const { error } = await supabase
+          .from("agenda_visitas")
+          .update(editPayload)
+          .eq("id", editVisitaId);
+        if (error) throw error;
+        toast.success("Visita atualizada!");
+        setEditVisitaId(null);
+      } else {
+        const insertPayload = {
+          ...editPayload,
+          user_id: userData.user.id,
+          status: "agendada",
+        };
+        const { error } = await supabase.from("agenda_visitas").insert(insertPayload);
+        if (error) throw error;
+        toast.success("Visita agendada!");
+      }
+
       setDialogOpen(false);
       fetchVisitas();
     } catch (err: any) {
@@ -185,6 +229,14 @@ export default function Agenda() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleDeleteVisita = async () => {
+    if (!deleteVisitaId) return;
+    const { error } = await supabase.from("agenda_visitas").delete().eq("id", deleteVisitaId);
+    if (error) { toast.error("Erro ao excluir visita."); }
+    else { toast.success("Visita excluída."); fetchVisitas(); }
+    setDeleteVisitaId(null);
   };
 
   const handleFeedback = async () => {
@@ -364,12 +416,65 @@ export default function Agenda() {
                     </div>
                     <div className="space-y-0.5">
                       {dayVisitas.slice(0, 3).map((v) => (
-                        <div
-                          key={v.id}
-                          className={`text-[10px] px-1 py-0.5 rounded truncate ${STATUS_CONFIG[v.status]?.color || "bg-blue-500/15 text-blue-600"}`}
-                        >
-                          {v.hora_visita?.slice(0, 5) ?? "--:--"} {v.lead?.nome?.split(" ")[0] || "Visita"}
-                        </div>
+                        <Popover key={v.id}>
+                          <PopoverTrigger asChild>
+                            <div
+                              className={`text-[10px] px-1 py-0.5 rounded truncate cursor-pointer ${STATUS_CONFIG[v.status]?.color || "bg-blue-500/15 text-blue-600"}`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {v.hora_visita?.slice(0, 5) ?? "--:--"} {v.lead?.nome?.split(" ")[0] || "Visita"}
+                            </div>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-64 p-3" onClick={(e) => e.stopPropagation()}>
+                            <div className="space-y-2">
+                              <p className="font-bold text-sm">{v.lead?.nome || "Lead não vinculado"}</p>
+                              {v.imovel && (
+                                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" />
+                                  {v.imovel.titulo || v.imovel.tipo}
+                                  {v.imovel.endereco ? ` · ${v.imovel.endereco}` : ""}
+                                </p>
+                              )}
+                              {v.corretor && (
+                                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <User className="h-3 w-3" />
+                                  {v.corretor.nome}
+                                </p>
+                              )}
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {v.data_visita} {v.hora_visita?.slice(0, 5) ?? "--:--"}
+                              </p>
+                              <p className="text-xs text-muted-foreground capitalize">Tipo: {v.tipo}</p>
+                              <Badge variant="outline" className={`text-xs ${STATUS_CONFIG[v.status]?.color}`}>
+                                {STATUS_CONFIG[v.status]?.label}
+                              </Badge>
+                              {v.observacoes && (
+                                <p className="text-xs italic text-muted-foreground">{v.observacoes}</p>
+                              )}
+                              <div className="flex items-center gap-1 pt-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2"
+                                  onClick={() => openEdit(v)}
+                                >
+                                  <Pencil className="h-3.5 w-3.5 mr-1" />
+                                  Editar
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-destructive hover:text-destructive"
+                                  onClick={() => setDeleteVisitaId(v.id)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 mr-1" />
+                                  Excluir
+                                </Button>
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       ))}
                       {dayVisitas.length > 3 && (
                         <div className="text-[10px] text-muted-foreground px-1">
@@ -418,6 +523,8 @@ export default function Agenda() {
                     });
                     setFeedbackDialogOpen(true);
                   }}
+                  onEdit={(visita) => openEdit(visita)}
+                  onDelete={(id) => setDeleteVisitaId(id)}
                 />
               ))
             )}
@@ -425,11 +532,11 @@ export default function Agenda() {
         </Card>
       )}
 
-      {/* Dialog nova visita */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      {/* Dialog nova / editar visita */}
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditVisitaId(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Agendar Visita</DialogTitle>
+            <DialogTitle>{editVisitaId ? "Editar Visita" : "Agendar Visita"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1">
@@ -518,9 +625,9 @@ export default function Agenda() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { setDialogOpen(false); setEditVisitaId(null); }}>Cancelar</Button>
             <Button onClick={handleSave} disabled={saving}>
-              {saving ? "Salvando..." : "Agendar"}
+              {saving ? "Salvando..." : editVisitaId ? "Salvar alterações" : "Agendar"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -582,11 +689,39 @@ export default function Agenda() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* AlertDialog confirmação de exclusão */}
+      <AlertDialog open={!!deleteVisitaId} onOpenChange={(open) => { if (!open) setDeleteVisitaId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir visita?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. A visita será removida permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteVisita} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
-function VisitaCard({ visita, onFeedback }: { visita: Visita; onFeedback: () => void }) {
+function VisitaCard({
+  visita,
+  onFeedback,
+  onEdit,
+  onDelete,
+}: {
+  visita: Visita;
+  onFeedback: () => void;
+  onEdit: (visita: Visita) => void;
+  onDelete: (id: string) => void;
+}) {
   const cfg = STATUS_CONFIG[visita.status] || STATUS_CONFIG.agendada;
   const Icon = cfg.icon;
 
@@ -631,11 +766,24 @@ function VisitaCard({ visita, onFeedback }: { visita: Visita; onFeedback: () => 
         )}
       </div>
 
-      {(visita.status === "agendada" || visita.status === "confirmada") && (
-        <Button variant="ghost" size="sm" onClick={onFeedback} className="text-xs h-7 shrink-0">
-          Feedback
+      <div className="flex items-center gap-1 shrink-0">
+        {(visita.status === "agendada" || visita.status === "confirmada") && (
+          <Button variant="ghost" size="sm" onClick={onFeedback} className="text-xs h-7">
+            Feedback
+          </Button>
+        )}
+        <Button variant="ghost" size="sm" onClick={() => onEdit(visita)} className="h-7 px-2">
+          <Pencil className="h-3.5 w-3.5" />
         </Button>
-      )}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onDelete(visita.id)}
+          className="h-7 px-2 text-destructive hover:text-destructive"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
     </div>
   );
 }

@@ -43,15 +43,14 @@ export function PlataformaProvider({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<PlataformaConfig>(defaults);
   const [loading, setLoading] = useState(true);
 
-  const fetchConfig = useCallback(async () => {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) { setLoading(false); return; }
-
+  const fetchConfig = useCallback(async (userId: string) => {
     const { data } = await supabase
       .from("configuracoes_sistema")
       .select("*")
-      .eq("user_id", userData.user.id)
+      .eq("user_id", userId)
       .maybeSingle();
+
+    console.log("[PlataformaContext] fetchConfig userId:", userId, "data:", data);
 
     if (data) {
       setConfig({
@@ -65,20 +64,46 @@ export function PlataformaProvider({ children }: { children: ReactNode }) {
         email_suporte: data.email_suporte,
         email_gestor: data.email_gestor,
       });
+    } else {
+      setConfig(defaults);
     }
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    fetchConfig();
+    // Use getSession (reads localStorage — instant, no HTTP) to load config immediately
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        fetchConfig(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    // Re-fetch on login/logout
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        fetchConfig(session.user.id);
+      } else {
+        setConfig(defaults);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [fetchConfig]);
 
   const updateConfig = (partial: Partial<PlataformaConfig>) => {
     setConfig((prev) => ({ ...prev, ...partial }));
   };
 
+  const refetch = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) fetchConfig(session.user.id);
+  }, [fetchConfig]);
+
   return (
-    <PlataformaContext.Provider value={{ config, loading, refetch: fetchConfig, updateConfig }}>
+    <PlataformaContext.Provider value={{ config, loading, refetch, updateConfig }}>
       {children}
     </PlataformaContext.Provider>
   );

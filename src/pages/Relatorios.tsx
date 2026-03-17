@@ -9,8 +9,11 @@ import {
   ChevronLeft, Sparkles, Users, Home, CalendarCheck,
   FileSignature, DollarSign, MapPin,
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, subMonths, startOfMonth, startOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import {
+  PieChart as RechartsPie, Pie, Cell, ResponsiveContainer, Tooltip,
+} from "recharts";
 import { useToast } from "@/hooks/use-toast";
 import ReactMarkdown from "react-markdown";
 
@@ -211,6 +214,8 @@ export default function Relatorios() {
         </Button>
       </div>
 
+      <ConversaoVisitas />
+
       {relatorios.length === 0 ? (
         <Card className="bg-card border-border">
           <CardContent className="p-10 text-center">
@@ -289,5 +294,252 @@ export default function Relatorios() {
         </div>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ConversaoVisitas — standalone section shown in the list view
+// ---------------------------------------------------------------------------
+
+type FiltroCV = "mes" | "3meses" | "ano" | "tudo";
+
+interface VisitaRow {
+  id: string;
+  lead_id: string | null;
+  corretor_id: string | null;
+  corretor_nome?: string | null;
+  data_visita: string;
+}
+
+interface ContratoRow {
+  id: string;
+  lead_id: string | null;
+}
+
+interface CorretorStat {
+  nome: string;
+  visitas: number;
+  contratos: number;
+  taxa: number;
+}
+
+const PIE_COLORS = ["#22c55e", "#ef4444"];
+
+function ConversaoVisitas() {
+  const [filtro, setFiltro] = useState<FiltroCV>("mes");
+  const [loading, setLoading] = useState(true);
+  const [totalVisitas, setTotalVisitas] = useState(0);
+  const [visitasComContrato, setVisitasComContrato] = useState(0);
+  const [corretores, setCorretores] = useState<CorretorStat[]>([]);
+
+  useEffect(() => {
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtro]);
+
+  async function fetchData() {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const now = new Date();
+      let dataInicio: string | null = null;
+      if (filtro === "mes") {
+        dataInicio = format(startOfMonth(now), "yyyy-MM-dd");
+      } else if (filtro === "3meses") {
+        dataInicio = format(startOfMonth(subMonths(now, 2)), "yyyy-MM-dd");
+      } else if (filtro === "ano") {
+        dataInicio = format(startOfYear(now), "yyyy-MM-dd");
+      }
+
+      // Fetch visitas realizadas
+      let visitasQuery = supabase
+        .from("agenda_visitas")
+        .select("id, lead_id, corretor_id, corretor_nome, data_visita")
+        .eq("user_id", user.id)
+        .eq("status", "realizada");
+      if (dataInicio) visitasQuery = visitasQuery.gte("data_visita", dataInicio);
+      const { data: visitasData } = await visitasQuery;
+      const visitas: VisitaRow[] = visitasData || [];
+
+      // Fetch contratos
+      let contratosQuery = supabase
+        .from("contratos")
+        .select("id, lead_id")
+        .eq("user_id", user.id);
+      if (dataInicio) contratosQuery = contratosQuery.gte("created_at", dataInicio);
+      const { data: contratosData } = await contratosQuery;
+      const contratos: ContratoRow[] = contratosData || [];
+
+      const contratoLeadIds = new Set(
+        contratos.map((c) => c.lead_id).filter(Boolean) as string[]
+      );
+
+      // KPIs
+      const comContrato = visitas.filter(
+        (v) => v.lead_id && contratoLeadIds.has(v.lead_id)
+      ).length;
+      setTotalVisitas(visitas.length);
+      setVisitasComContrato(comContrato);
+
+      // Ranking por corretor
+      const map = new Map<string, { nome: string; visitas: number; contratos: number }>();
+      for (const v of visitas) {
+        const key = v.corretor_id ?? "sem_corretor";
+        const nome = v.corretor_nome ?? v.corretor_id ?? "Sem corretor";
+        if (!map.has(key)) map.set(key, { nome, visitas: 0, contratos: 0 });
+        const entry = map.get(key)!;
+        entry.visitas += 1;
+        if (v.lead_id && contratoLeadIds.has(v.lead_id)) entry.contratos += 1;
+      }
+      const ranking: CorretorStat[] = Array.from(map.values())
+        .map((e) => ({
+          nome: e.nome,
+          visitas: e.visitas,
+          contratos: e.contratos,
+          taxa: e.visitas > 0 ? parseFloat(((e.contratos / e.visitas) * 100).toFixed(1)) : 0,
+        }))
+        .sort((a, b) => b.taxa - a.taxa);
+      setCorretores(ranking);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const visitasSemContrato = totalVisitas - visitasComContrato;
+  const taxaConversao = totalVisitas > 0
+    ? ((visitasComContrato / totalVisitas) * 100).toFixed(1)
+    : "0.0";
+
+  const pieData = [
+    { name: "Convertidas", value: visitasComContrato },
+    { name: "Não Convertidas", value: visitasSemContrato },
+  ];
+
+  const filtros: { key: FiltroCV; label: string }[] = [
+    { key: "mes", label: "Este Mês" },
+    { key: "3meses", label: "3 Meses" },
+    { key: "ano", label: "Este Ano" },
+    { key: "tudo", label: "Tudo" },
+  ];
+
+  const kpis = [
+    { label: "Total Visitas Realizadas", value: totalVisitas, color: "text-foreground" },
+    { label: "Geraram Contrato", value: visitasComContrato, color: "text-green-500" },
+    { label: "Não Converteram", value: visitasSemContrato, color: "text-destructive" },
+    { label: "Taxa de Conversão", value: `${taxaConversao}%`, color: "text-primary" },
+  ];
+
+  return (
+    <Card className="bg-card border-border">
+      <CardHeader className="pb-2 pt-4 px-5">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+            <CalendarCheck className="h-4 w-4 text-primary" />
+            Conversão de Visitas
+          </CardTitle>
+          <div className="flex gap-1">
+            {filtros.map((f) => (
+              <Button
+                key={f.key}
+                size="sm"
+                variant={filtro === f.key ? "default" : "outline"}
+                className="h-7 text-xs px-2.5"
+                onClick={() => setFiltro(f.key)}
+              >
+                {f.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="px-5 pb-5 space-y-4">
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <>
+            {/* KPI cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {kpis.map(({ label, value, color }) => (
+                <Card key={label} className="bg-muted/30 border-border">
+                  <CardContent className="p-3 space-y-0.5">
+                    <p className="text-[11px] text-muted-foreground leading-tight">{label}</p>
+                    <p className={`text-2xl font-bold ${color}`}>{value}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Chart + Table */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Pie chart */}
+              <div className="flex flex-col items-center justify-center">
+                <p className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wide">Distribuição</p>
+                {totalVisitas === 0 ? (
+                  <p className="text-xs text-muted-foreground py-6">Sem dados no período</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={160}>
+                    <RechartsPie>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={40}
+                        outerRadius={65}
+                        paddingAngle={3}
+                        dataKey="value"
+                        label={({ name, percent }) =>
+                          `${name} ${(percent * 100).toFixed(0)}%`
+                        }
+                        labelLine={false}
+                      >
+                        {pieData.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: number) => [value, "Visitas"]} />
+                    </RechartsPie>
+                  </ResponsiveContainer>
+                )}
+              </div>
+
+              {/* Ranking table */}
+              <div>
+                <p className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wide">Ranking por Corretor</p>
+                {corretores.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-6">Sem dados no período</p>
+                ) : (
+                  <div className="overflow-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border text-muted-foreground">
+                          <th className="text-left pb-1.5 font-medium">Corretor</th>
+                          <th className="text-right pb-1.5 font-medium">Visitas</th>
+                          <th className="text-right pb-1.5 font-medium">Contratos</th>
+                          <th className="text-right pb-1.5 font-medium">Taxa %</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {corretores.map((c) => (
+                          <tr key={c.nome} className="border-b border-border/40 last:border-0">
+                            <td className="py-1.5 font-medium truncate max-w-[100px]">{c.nome}</td>
+                            <td className="py-1.5 text-right">{c.visitas}</td>
+                            <td className="py-1.5 text-right text-green-500">{c.contratos}</td>
+                            <td className="py-1.5 text-right font-semibold text-primary">{c.taxa}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }

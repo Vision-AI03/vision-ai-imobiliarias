@@ -1029,7 +1029,7 @@ function ComissoesTab() {
               {filtered.length === 0 ? (
                 <tr><td colSpan={8} className="text-center py-8 text-muted-foreground text-sm">Nenhuma comissão cadastrada.</td></tr>
               ) : filtered.map(c => (
-                <tr key={c.id} className="border-t hover:bg-muted/30 transition-colors">
+                <tr key={c.id} className={`border-t transition-colors ${c.status === "recebida" ? "bg-green-500/5 hover:bg-green-500/8" : "hover:bg-muted/30"}`}>
                   <td className="px-4 py-3">
                     <p className="font-medium text-xs">{c.imovel?.titulo || c.imovel?.tipo || "—"}</p>
                     {c.lead?.nome && <p className="text-[10px] text-muted-foreground">{c.lead.nome}</p>}
