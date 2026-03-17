@@ -54,10 +54,9 @@ function AppRoutes() {
     );
   }
 
-  // DEV: login desativado temporariamente para testes
-  // if (!session) {
-  //   return <Auth />;
-  // }
+  if (!session) {
+    return <Auth />;
+  }
 
   return (
     <Suspense fallback={
