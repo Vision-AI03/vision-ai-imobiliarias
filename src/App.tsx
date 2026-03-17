@@ -23,6 +23,7 @@ const Notificacoes = lazy(() => import("./pages/Notificacoes"));
 const Relatorios = lazy(() => import("./pages/Relatorios"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Imoveis = lazy(() => import("./pages/Imoveis"));
+const ImovelDetalhe = lazy(() => import("./pages/ImovelDetalhe"));
 const Agenda = lazy(() => import("./pages/Agenda"));
 const Corretores = lazy(() => import("./pages/Corretores"));
 const Aparencia = lazy(() => import("./pages/Aparencia"));
@@ -83,6 +84,7 @@ function AppRoutes() {
           <Route path="/notificacoes" element={<Notificacoes />} />
           {/* Imobiliários novos */}
           <Route path="/imoveis" element={<Imoveis />} />
+          <Route path="/imoveis/:id" element={<ImovelDetalhe />} />
           <Route path="/agenda" element={<Agenda />} />
           <Route path="/corretores" element={<Corretores />} />
           {/* Configurações */}
