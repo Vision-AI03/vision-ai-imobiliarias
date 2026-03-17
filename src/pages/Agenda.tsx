@@ -308,9 +308,23 @@ export default function Agenda() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setView(view === "mes" ? "dia" : "mes")}>
-            {view === "mes" ? "Ver Hoje" : "Ver Mês"}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const today = new Date();
+              setCurrentMonth(today);
+              setSelectedDay(today);
+              setView("dia");
+            }}
+          >
+            Hoje
           </Button>
+          {view === "dia" && (
+            <Button variant="ghost" size="sm" onClick={() => setView("mes")}>
+              Ver Mês
+            </Button>
+          )}
           <Button onClick={() => openCreate()}>
             <Plus className="h-4 w-4 mr-2" />
             Nova Visita
@@ -420,7 +434,7 @@ export default function Agenda() {
                           <PopoverTrigger asChild>
                             <div
                               className={`text-[10px] px-1 py-0.5 rounded truncate cursor-pointer ${STATUS_CONFIG[v.status]?.color || "bg-blue-500/15 text-blue-600"}`}
-                              onClick={(e) => e.stopPropagation()}
+                              onClick={(e) => { e.stopPropagation(); setSelectedDay(day); setView("dia"); }}
                             >
                               {v.hora_visita?.slice(0, 5) ?? "--:--"} {v.lead?.nome?.split(" ")[0] || "Visita"}
                             </div>
@@ -491,7 +505,7 @@ export default function Agenda() {
       )}
 
       {/* Painel do dia selecionado */}
-      {selectedDay && view === "dia" && (
+      {selectedDay && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center justify-between">

@@ -331,22 +331,23 @@ Gere o relatório com exatamente estas seções em Markdown:
 
 Responda APENAS com o relatório em Markdown, sem texto adicional antes ou depois.`;
 
-  const geminiKey = Deno.env.get("GEMINI_API_KEY");
-  if (!geminiKey) throw new Error("GEMINI_API_KEY não configurada");
+  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+  if (!lovableKey) throw new Error("LOVABLE_API_KEY não configurada");
 
-  const geminiRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.4, maxOutputTokens: 5000 },
-      }),
-    }
-  );
-  const geminiData = await geminiRes.json();
-  const relatorioMarkdown = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "Relatório não disponível.";
+  const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${lovableKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.0-flash",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 5000,
+    }),
+  });
+  const aiData = await aiRes.json();
+  const relatorioMarkdown = aiData.choices?.[0]?.message?.content || "Relatório não disponível.";
 
   // Extract sections
   const extract = (pattern: RegExp) => relatorioMarkdown.match(pattern)?.[1]?.trim() || "";

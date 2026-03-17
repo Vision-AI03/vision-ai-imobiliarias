@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   BarChart2, TrendingUp, TrendingDown, Minus, Loader2,
   ChevronLeft, Sparkles, Users, Home, CalendarCheck,
-  FileSignature, DollarSign, MapPin,
+  FileSignature, DollarSign, MapPin, Copy, Printer,
 } from "lucide-react";
 import { format, subMonths, startOfMonth, startOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -72,17 +72,42 @@ export default function Relatorios() {
     setGenerating(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.functions.invoke("generate-weekly-report", {
+      const { data, error } = await supabase.functions.invoke("generate-weekly-report", {
         body: { user_id: user?.id },
       });
       if (error) throw error;
       toast({ title: "Relatório gerado com sucesso!" });
+      const newId = data?.results?.[0]?.relatorio_id;
       await fetchRelatorios();
+      if (newId) {
+        // Auto-navigate to the new report
+        const { data: newRelatorio } = await supabase
+          .from("relatorios_semanais")
+          .select("*")
+          .eq("id", newId)
+          .maybeSingle();
+        if (newRelatorio) setSelected(newRelatorio as Relatorio);
+      }
     } catch (err: any) {
       toast({ title: "Erro ao gerar relatório", description: err.message, variant: "destructive" });
     } finally {
       setGenerating(false);
     }
+  }
+
+  function handleCopiarRelatorio(text: string) {
+    navigator.clipboard.writeText(text).then(() => {
+      toast({ title: "Relatório copiado!" });
+    });
+  }
+
+  function handleExportarPDF(relatorio: Relatorio) {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) { toast({ title: "Permita popups para exportar PDF", variant: "destructive" }); return; }
+    const semana = formatSemana(relatorio.semana_inicio, relatorio.semana_fim);
+    printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Relatório ${semana}</title><style>body{font-family:Arial,sans-serif;padding:40px;font-size:12pt;line-height:1.6;}h1{font-size:18pt;}h2{font-size:14pt;margin-top:24px;}h3{font-size:12pt;}pre{white-space:pre-wrap;font-family:inherit;}</style></head><body><h1>Relatório Semanal — ${semana}</h1><pre>${relatorio.relatorio_completo.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre></body></html>`);
+    printWindow.document.close();
+    printWindow.print();
   }
 
   function formatSemana(inicio: string, fim: string) {
@@ -115,15 +140,25 @@ export default function Relatorios() {
 
     return (
       <div className="space-y-5">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <Button variant="ghost" size="icon" onClick={() => setSelected(null)}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div>
+          <div className="flex-1 min-w-0">
             <h1 className="text-xl font-bold">Semana {formatSemana(selected.semana_inicio, selected.semana_fim)}</h1>
             <p className="text-xs text-muted-foreground">
               Gerado em {format(new Date(selected.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
             </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => handleCopiarRelatorio(selected.relatorio_completo)}>
+              <Copy className="h-3.5 w-3.5" />
+              Copiar
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => handleExportarPDF(selected)}>
+              <Printer className="h-3.5 w-3.5" />
+              Exportar PDF
+            </Button>
           </div>
         </div>
 

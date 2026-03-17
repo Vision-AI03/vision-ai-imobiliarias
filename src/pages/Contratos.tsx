@@ -208,7 +208,7 @@ export default function Contratos() {
           </TabsTrigger>
           <TabsTrigger value="gerar" className="gap-2">
             <MessageSquareText className="h-4 w-4" />
-            Gerar com IA
+            Preencher com IA
           </TabsTrigger>
           <TabsTrigger value="gerados" className="gap-2">
             <Files className="h-4 w-4" />

@@ -1,8 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -10,7 +8,8 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useConfiguracoesSistema } from "@/hooks/useConfiguracoesSistema";
-import { Send, Loader2, Save, FileText, Bot, UserIcon, Sparkles, Home, Building2 } from "lucide-react";
+import { Loader2, Save, FileText, Sparkles, Building2, UserIcon, Printer } from "lucide-react";
+import { format } from "date-fns";
 
 interface Template {
   id: string;
@@ -41,59 +40,50 @@ interface Imovel {
   corretor?: { nome: string; creci: string | null } | null;
 }
 
-interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-}
-
 interface GerarContratoTabProps {
   templates: Template[];
   onContratoGerado: () => void;
 }
 
-// Fluxo guiado para contratos imobiliários
-const FLOW_STEPS = [
-  "tipo",
-  "imovel",
-  "comprador",
-  "vendedor",
-  "condicoes",
-  "clausulas",
-  "gerar",
-];
+function renderPreview(text: string) {
+  const parts = text.split(/(\{\{[^}]+\}\})/g);
+  return parts.map((part, i) =>
+    /^\{\{[^}]+\}\}$/.test(part)
+      ? (
+        <mark
+          key={i}
+          className="bg-yellow-200 dark:bg-yellow-800/70 text-yellow-900 dark:text-yellow-100 px-0.5 rounded"
+        >
+          {part}
+        </mark>
+      )
+      : <span key={i}>{part}</span>
+  );
+}
 
 export default function GerarContratoTab({ templates, onContratoGerado }: GerarContratoTabProps) {
   const { toast } = useToast();
   const { config } = useConfiguracoesSistema();
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
-  const [selectedLead, setSelectedLead] = useState<string>("");
-  const [selectedImovel, setSelectedImovel] = useState<string>("");
+  const [selectedLead, setSelectedLead] = useState<string>("__none__");
+  const [selectedImovel, setSelectedImovel] = useState<string>("__none__");
   const [leads, setLeads] = useState<Lead[]>([]);
   const [imoveis, setImoveis] = useState<Imovel[]>([]);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
+  const [contractFilled, setContractFilled] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const [contractPreview, setContractPreview] = useState<string>("");
   const [saving, setSaving] = useState(false);
-  const [flowStep, setFlowStep] = useState(0);
-  const [collectedData, setCollectedData] = useState<Record<string, string>>({});
-  const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchLeadsImoveis();
   }, []);
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
   async function fetchLeadsImoveis() {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
-
     const [{ data: leadsData }, { data: imoveisData }] = await Promise.all([
       supabase.from("leads").select("id, nome, email, telefone").order("nome").limit(200),
-      supabase.from("imoveis")
+      supabase
+        .from("imoveis")
         .select("id, titulo, tipo, endereco, bairro, cidade, valor_venda, valor_aluguel, matricula, cartorio_registro, corretor:corretores(nome, creci)")
         .eq("user_id", userData.user.id)
         .order("created_at", { ascending: false })
@@ -103,161 +93,104 @@ export default function GerarContratoTab({ templates, onContratoGerado }: GerarC
     setImoveis((imoveisData as unknown as Imovel[]) || []);
   }
 
-  function getTemplate() {
-    return templates.find(t => t.id === selectedTemplate);
-  }
+  const template = templates.find(t => t.id === selectedTemplate);
+  const lead = leads.find(l => l.id === selectedLead);
+  const imovel = imoveis.find(i => i.id === selectedImovel);
 
-  function getImovelData() {
-    return imoveis.find(i => i.id === selectedImovel);
-  }
-
-  function getLeadData() {
-    return leads.find(l => l.id === selectedLead);
-  }
-
-  // Inicia o fluxo guiado
-  function startGuidedFlow() {
-    const template = getTemplate();
+  async function handlePreencherIA() {
     if (!template) {
-      toast({ title: "Selecione um template primeiro", variant: "destructive" });
-      return;
-    }
-    setMessages([{
-      role: "assistant",
-      content: `Olá! Vou te ajudar a gerar o **${template.nome}**.\n\nPrimeiro, selecione o imóvel acima (ou confirme o já selecionado) e o lead/comprador. Depois, descreva os dados das partes e as condições financeiras na caixa de mensagem abaixo.\n\nPode incluir:\n• Nome, CPF, RG do comprador e do vendedor\n• Condições de pagamento (entrada, financiamento, parcelas)\n• Prazo de entrega/assinatura\n• Cláusulas especiais\n\nQuando tiver tudo pronto, envie e eu gero o contrato completo.`,
-    }]);
-    setFlowStep(1);
-    setContractPreview("");
-  }
-
-  async function handleSend() {
-    if (!input.trim()) return;
-    const template = getTemplate();
-    if (!template) {
-      toast({ title: "Selecione um template primeiro", variant: "destructive" });
+      toast({ title: "Selecione um template", variant: "destructive" });
       return;
     }
 
-    const imovel = getImovelData();
-    const lead = getLeadData();
+    const today = format(new Date(), "dd/MM/yyyy");
+    const lines: string[] = [];
+    lines.push(`Data atual: ${today}`);
+    lines.push(`Imobiliária: ${config.nome_imobiliaria || config.nome_plataforma || "Vision AI"}`);
+    if (config.cnpj) lines.push(`CNPJ: ${config.cnpj}`);
+    if (config.telefone_suporte) lines.push(`Telefone: ${config.telefone_suporte}`);
+    if (config.email_suporte) lines.push(`Email: ${config.email_suporte}`);
 
-    // Montar contexto do imóvel e imobiliária para a IA
-    const contexto = buildContexto(template, imovel, lead);
+    if (imovel) {
+      lines.push(`\nIMÓVEL:`);
+      lines.push(`- Tipo: ${imovel.tipo}`);
+      if (imovel.titulo) lines.push(`- Título: ${imovel.titulo}`);
+      if (imovel.endereco) lines.push(`- Endereço: ${imovel.endereco}${imovel.bairro ? `, ${imovel.bairro}` : ""}${imovel.cidade ? `, ${imovel.cidade}` : ""}`);
+      if (imovel.matricula) lines.push(`- Matrícula: ${imovel.matricula}`);
+      if (imovel.cartorio_registro) lines.push(`- Cartório: ${imovel.cartorio_registro}`);
+      if (imovel.valor_venda) lines.push(`- Valor de venda: R$ ${imovel.valor_venda.toLocaleString("pt-BR")}`);
+      if (imovel.valor_aluguel) lines.push(`- Valor de aluguel: R$ ${imovel.valor_aluguel.toLocaleString("pt-BR")}/mês`);
+      if (imovel.corretor?.nome) lines.push(`- Corretor: ${imovel.corretor.nome}${imovel.corretor.creci ? ` (CRECI: ${imovel.corretor.creci})` : ""}`);
+    }
 
-    const userMsg: ChatMessage = { role: "user", content: input.trim() };
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
-    setInput("");
+    if (lead) {
+      lines.push(`\nCLIENTE:`);
+      lines.push(`- Nome: ${lead.nome}`);
+      if (lead.email) lines.push(`- Email: ${lead.email}`);
+      if (lead.telefone) lines.push(`- Telefone: ${lead.telefone}`);
+    }
+
+    lines.push(`\nInstruções: Preencha TODOS os {{campos}} do template com os dados acima. Para campos sem dados disponíveis, mantenha o placeholder {{campo}}. Retorne SOMENTE o contrato preenchido entre as tags <contrato> e </contrato>, sem nenhum texto adicional fora das tags.`);
+
     setLoading(true);
-
     try {
       const { data, error } = await supabase.functions.invoke("fill-contract", {
         body: {
           action: "fill_contract",
-          template_content: contexto + "\n\n" + template.conteudo_template,
-          messages: newMessages,
-          sistema_context: `Você é um assistente especializado em contratos imobiliários.
-          Imobiliária: ${config.nome_imobiliaria || config.nome_plataforma}.
-          Quando você gerar o contrato, coloque entre tags <contrato> e </contrato>.
-          Use linguagem jurídica adequada para o mercado imobiliário brasileiro.`,
+          template_content: template.conteudo_template,
+          messages: [{ role: "user", content: lines.join("\n") }],
         },
       });
 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      const content = data.content || "";
-      setMessages(prev => [...prev, { role: "assistant", content }]);
-
+      const content: string = data.content || "";
       const match = content.match(/<contrato>([\s\S]*?)<\/contrato>/);
-      if (match) {
-        setContractPreview(match[1].trim());
-      }
+      setContractFilled(match ? match[1].trim() : content.trim());
     } catch (e: any) {
-      toast({ title: "Erro ao processar", description: e.message, variant: "destructive" });
+      toast({ title: "Erro ao preencher contrato", description: e.message, variant: "destructive" });
     }
     setLoading(false);
   }
 
-  function buildContexto(template: Template, imovel: Imovel | undefined, lead: Lead | undefined): string {
-    const parts: string[] = ["=== CONTEXTO AUTOMÁTICO ==="];
-
-    if (config.nome_imobiliaria) {
-      parts.push(`Imobiliária: ${config.nome_imobiliaria}`);
-      if (config.cnpj) parts.push(`CNPJ: ${config.cnpj}`);
+  function handlePDF() {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      toast({ title: "Permita popups para gerar PDF", variant: "destructive" });
+      return;
     }
-
-    if (imovel) {
-      parts.push(`\nImóvel selecionado:`);
-      parts.push(`- Tipo: ${imovel.tipo}`);
-      if (imovel.titulo) parts.push(`- Título: ${imovel.titulo}`);
-      if (imovel.endereco) parts.push(`- Endereço: ${imovel.endereco}${imovel.bairro ? `, ${imovel.bairro}` : ""}${imovel.cidade ? `, ${imovel.cidade}` : ""}`);
-      if (imovel.matricula) parts.push(`- Matrícula: ${imovel.matricula}`);
-      if (imovel.cartorio_registro) parts.push(`- Cartório: ${imovel.cartorio_registro}`);
-      if (imovel.valor_venda) parts.push(`- Valor de venda: R$ ${imovel.valor_venda.toLocaleString("pt-BR")}`);
-      if (imovel.valor_aluguel) parts.push(`- Valor de aluguel: R$ ${imovel.valor_aluguel.toLocaleString("pt-BR")}/mês`);
-      if (imovel.corretor) {
-        parts.push(`- Corretor: ${imovel.corretor.nome}${imovel.corretor.creci ? ` (CRECI: ${imovel.corretor.creci})` : ""}`);
-      }
-    }
-
-    if (lead) {
-      parts.push(`\nLead/Cliente selecionado:`);
-      parts.push(`- Nome: ${lead.nome}`);
-      if (lead.email) parts.push(`- Email: ${lead.email}`);
-      if (lead.telefone) parts.push(`- Telefone: ${lead.telefone}`);
-    }
-
-    parts.push("\n=== FIM DO CONTEXTO AUTOMÁTICO ===\n");
-    return parts.join("\n");
+    printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Contrato</title><style>body{font-family:Arial,sans-serif;padding:40px;font-size:12pt;line-height:1.6;}pre{white-space:pre-wrap;font-family:inherit;}</style></head><body><pre>${contractFilled.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre></body></html>`);
+    printWindow.document.close();
+    printWindow.print();
   }
 
   async function handleSaveRascunho() {
-    if (!contractPreview) {
-      toast({ title: "Gere um contrato antes de salvar", variant: "destructive" });
+    if (!contractFilled) {
+      toast({ title: "Preencha com IA antes de salvar", variant: "destructive" });
       return;
     }
-    const template = getTemplate();
-    const lead = getLeadData();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-
     setSaving(true);
     try {
-      const { data } = await supabase.functions.invoke("fill-contract", {
-        body: {
-          action: "extract_data",
-          template_content: "",
-          messages: messages.filter(m => m.role === "user"),
-        },
-      });
-      const extractedData = data?.data || {};
-
       const { error } = await supabase.from("contratos_gerados").insert({
         user_id: user.id,
         template_id: template?.id || null,
-        lead_id: selectedLead || null,
-        nome_cliente: extractedData.nome_cliente || lead?.nome || "Cliente",
-        email_cliente: extractedData.email_cliente || lead?.email || null,
-        telefone_cliente: extractedData.telefone_cliente || lead?.telefone || null,
-        cnpj_cpf: extractedData.cnpj_cpf || null,
-        endereco: extractedData.endereco || null,
+        lead_id: lead?.id || null,
+        nome_cliente: lead?.nome || "Cliente",
+        email_cliente: lead?.email || null,
+        telefone_cliente: lead?.telefone || null,
         dados_preenchidos: {
-          ...extractedData,
-          imovel_id: selectedImovel || null,
+          imovel_id: imovel?.id || null,
           tipo_contrato: template?.tipo || null,
         },
-        conteudo_final: contractPreview,
-        valor_total: extractedData.valor_total || null,
-        numero_parcelas: extractedData.numero_parcelas || null,
-        tipo_pagamento: extractedData.tipo_pagamento || "avista",
-        valor_recorrente: extractedData.valor_recorrente || null,
+        conteudo_final: contractFilled,
         status: "rascunho",
-        chat_historico: messages,
       } as any);
 
       if (error) throw error;
-      toast({ title: "Rascunho salvo com sucesso!" });
+      toast({ title: "Rascunho salvo!" });
       onContratoGerado();
     } catch (err: any) {
       toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
@@ -265,16 +198,16 @@ export default function GerarContratoTab({ templates, onContratoGerado }: GerarC
     setSaving(false);
   }
 
-  const imovelSelecionado = getImovelData();
-  const leadSelecionado = getLeadData();
+  // Count remaining unfilled fields
+  const unfilledCount = (contractFilled.match(/\{\{[^}]+\}\}/g) || []).length;
 
   return (
     <div className="space-y-4">
-      {/* Seleção de template, imóvel e lead */}
+      {/* Selectors */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div>
           <label className="text-xs font-medium text-muted-foreground mb-1 block">Template *</label>
-          <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
+          <Select value={selectedTemplate} onValueChange={(v) => { setSelectedTemplate(v); setContractFilled(""); }}>
             <SelectTrigger><SelectValue placeholder="Selecione o tipo de contrato" /></SelectTrigger>
             <SelectContent>
               {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>)}
@@ -283,13 +216,13 @@ export default function GerarContratoTab({ templates, onContratoGerado }: GerarC
         </div>
         <div>
           <label className="text-xs font-medium text-muted-foreground mb-1 block">
-            <Home className="inline h-3 w-3 mr-1" />
+            <Building2 className="inline h-3 w-3 mr-1" />
             Imóvel (auto-preenche dados)
           </label>
-          <Select value={selectedImovel} onValueChange={setSelectedImovel}>
+          <Select value={selectedImovel} onValueChange={(v) => { setSelectedImovel(v); setContractFilled(""); }}>
             <SelectTrigger><SelectValue placeholder="Selecione o imóvel" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Sem imóvel vinculado</SelectItem>
+              <SelectItem value="__none__">Sem imóvel vinculado</SelectItem>
               {imoveis.map(i => (
                 <SelectItem key={i.id} value={i.id}>
                   {i.titulo || i.tipo} — {i.endereco || i.bairro || "Sem endereço"}
@@ -299,32 +232,35 @@ export default function GerarContratoTab({ templates, onContratoGerado }: GerarC
           </Select>
         </div>
         <div>
-          <label className="text-xs font-medium text-muted-foreground mb-1 block">Lead / Cliente (opcional)</label>
-          <Select value={selectedLead} onValueChange={setSelectedLead}>
+          <label className="text-xs font-medium text-muted-foreground mb-1 block">
+            <UserIcon className="inline h-3 w-3 mr-1" />
+            Lead / Cliente (opcional)
+          </label>
+          <Select value={selectedLead} onValueChange={(v) => { setSelectedLead(v); setContractFilled(""); }}>
             <SelectTrigger><SelectValue placeholder="Vincular lead do CRM" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Sem lead vinculado</SelectItem>
-              {leads.map((l: Lead) => <SelectItem key={l.id} value={l.id}>{l.nome}</SelectItem>)}
+              <SelectItem value="__none__">Sem lead vinculado</SelectItem>
+              {leads.map(l => <SelectItem key={l.id} value={l.id}>{l.nome}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      {/* Info dos selecionados */}
-      {(imovelSelecionado || leadSelecionado) && (
+      {/* Context badges */}
+      {(imovel || lead) && (
         <div className="flex flex-wrap gap-2">
-          {imovelSelecionado && (
+          {imovel && (
             <div className="flex items-center gap-2 text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-lg">
               <Building2 className="h-3 w-3" />
-              {imovelSelecionado.tipo} · {imovelSelecionado.endereco || "Sem endereço"}
-              {imovelSelecionado.valor_venda && ` · R$ ${imovelSelecionado.valor_venda.toLocaleString("pt-BR")}`}
+              {imovel.tipo} · {imovel.endereco || imovel.bairro || "Sem endereço"}
+              {imovel.valor_venda ? ` · R$ ${imovel.valor_venda.toLocaleString("pt-BR")}` : ""}
             </div>
           )}
-          {leadSelecionado && (
+          {lead && (
             <div className="flex items-center gap-2 text-xs bg-secondary px-3 py-1.5 rounded-lg">
               <UserIcon className="h-3 w-3" />
-              {leadSelecionado.nome}
-              {leadSelecionado.telefone && ` · ${leadSelecionado.telefone}`}
+              {lead.nome}
+              {lead.telefone ? ` · ${lead.telefone}` : ""}
             </div>
           )}
         </div>
@@ -332,135 +268,73 @@ export default function GerarContratoTab({ templates, onContratoGerado }: GerarC
 
       {!selectedTemplate ? (
         <Card className="glass-card">
-          <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+          <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <Sparkles className="h-12 w-12 mb-4 opacity-40" />
-            <p>Selecione um template para começar a gerar um contrato imobiliário com IA.</p>
+            <p className="text-sm">Selecione um template para começar.</p>
             <p className="text-xs mt-1 text-muted-foreground/70">
-              A IA irá preencher automaticamente os dados do imóvel e do cliente selecionados.
+              A IA irá preencher automaticamente os dados do imóvel, cliente e imobiliária.
             </p>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Chat panel */}
-          <Card className="glass-card flex flex-col" style={{ minHeight: "520px" }}>
-            <div className="p-3 border-b border-border flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Bot className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">Assistente de Contratos</span>
-              </div>
-              {messages.length === 0 && (
-                <Button size="sm" variant="outline" onClick={startGuidedFlow} className="text-xs h-7">
-                  <Sparkles className="h-3 w-3 mr-1" />
-                  Iniciar
-                </Button>
-              )}
-            </div>
-            <ScrollArea className="flex-1 p-3">
-              <div className="space-y-3">
-                {messages.length === 0 && (
-                  <div className="text-center text-muted-foreground text-sm py-8 space-y-2">
-                    <Sparkles className="h-8 w-8 mx-auto opacity-30" />
-                    <p>Clique em <strong>Iniciar</strong> para começar o fluxo guiado.</p>
-                    <p className="text-xs text-muted-foreground/60">
-                      A IA vai guiar você pelas etapas e gerar o contrato automaticamente.
-                    </p>
-                  </div>
-                )}
-                {messages.map((msg, i) => (
-                  <div key={i} className={`flex gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                    {msg.role === "assistant" && <Bot className="h-5 w-5 text-primary mt-1 flex-shrink-0" />}
-                    <div className={`rounded-lg px-3 py-2 max-w-[85%] text-sm whitespace-pre-wrap ${
-                      msg.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted"
-                    }`}>
-                      {msg.role === "assistant"
-                        ? msg.content.replace(/<contrato>[\s\S]*?<\/contrato>/g, "📄 Contrato gerado → veja o preview ao lado")
-                        : msg.content
-                      }
-                    </div>
-                    {msg.role === "user" && <UserIcon className="h-5 w-5 text-muted-foreground mt-1 flex-shrink-0" />}
-                  </div>
-                ))}
-                {loading && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm">Gerando contrato...</span>
-                  </div>
-                )}
-                <div ref={chatEndRef} />
-              </div>
-            </ScrollArea>
-            <div className="p-3 border-t border-border space-y-2">
-              {messages.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {[
-                    "Gerar contrato agora",
-                    "Alterar percentual de comissão",
-                    "Adicionar cláusula de multa",
-                    "Mudar forma de pagamento",
-                  ].map(s => (
-                    <button
-                      key={s}
-                      onClick={() => setInput(s)}
-                      className="text-[10px] px-2 py-0.5 rounded-full border border-border hover:border-primary hover:text-primary transition-colors"
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="flex gap-2">
-                <Input
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  placeholder={messages.length === 0 ? "Clique em Iniciar primeiro..." : "Descreva dados das partes, condições, cláusulas..."}
-                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                  disabled={loading || messages.length === 0}
-                />
-                <Button onClick={handleSend} disabled={loading || !input.trim() || messages.length === 0} size="icon">
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </Card>
+        <div className="space-y-3">
+          {/* Action button */}
+          <div className="flex justify-center">
+            <Button
+              onClick={handlePreencherIA}
+              disabled={loading}
+              size="lg"
+              className="gap-2 px-8"
+            >
+              {loading
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> Preenchendo...</>
+                : <><Sparkles className="h-4 w-4" /> Preencher com IA</>
+              }
+            </Button>
+          </div>
 
-          {/* Preview panel */}
-          <Card className="glass-card flex flex-col" style={{ minHeight: "520px" }}>
+          {/* Preview */}
+          <Card className="glass-card">
             <div className="p-3 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FileText className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">Preview do Contrato</span>
+                <span className="text-sm font-medium">
+                  {contractFilled ? "Contrato Preenchido" : "Preview do Template"}
+                </span>
               </div>
-              {contractPreview && (
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={handleSaveRascunho} disabled={saving} className="h-7 text-xs">
-                    <Save className="h-3 w-3 mr-1" />
+              {contractFilled && (
+                <div className="flex items-center gap-2">
+                  {unfilledCount > 0 && (
+                    <span className="text-xs text-yellow-600 dark:text-yellow-400">
+                      {unfilledCount} campo{unfilledCount !== 1 ? "s" : ""} não preenchido{unfilledCount !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                  <Button size="sm" variant="outline" onClick={handlePDF} className="h-7 text-xs gap-1">
+                    <Printer className="h-3 w-3" />
+                    Gerar PDF
+                  </Button>
+                  <Button size="sm" onClick={handleSaveRascunho} disabled={saving} className="h-7 text-xs gap-1">
+                    <Save className="h-3 w-3" />
                     {saving ? "Salvando..." : "Salvar Rascunho"}
                   </Button>
                 </div>
               )}
             </div>
-            <ScrollArea className="flex-1 p-4">
-              {contractPreview ? (
-                <div className="text-sm leading-relaxed font-sans whitespace-pre-wrap bg-white dark:bg-muted/20 p-4 rounded border border-border min-h-full">
-                  {contractPreview}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-12">
-                  <FileText className="h-12 w-12 mb-4 opacity-40" />
-                  <p className="text-sm text-center">
-                    O contrato preenchido aparecerá aqui.
-                    <br />
-                    <span className="text-xs text-muted-foreground/60 mt-1 block">
-                      Inicie o assistente e forneça os dados das partes.
-                    </span>
-                  </p>
-                </div>
-              )}
+            <ScrollArea className="h-[480px]">
+              <div className="p-4 text-sm leading-relaxed font-mono whitespace-pre-wrap bg-white dark:bg-muted/10 min-h-[480px]">
+                {contractFilled
+                  ? renderPreview(contractFilled)
+                  : renderPreview(template.conteudo_template)
+                }
+              </div>
             </ScrollArea>
           </Card>
+
+          {contractFilled && unfilledCount === 0 && (
+            <p className="text-xs text-center text-green-600 dark:text-green-400">
+              Todos os campos foram preenchidos com sucesso.
+            </p>
+          )}
         </div>
       )}
     </div>

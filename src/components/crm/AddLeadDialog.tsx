@@ -26,7 +26,7 @@ const INITIAL = {
   vagas_desejado: "",
   prazo_decisao: "",
   origem_portal: "manual",
-  corretor_responsavel: "",
+  corretor_id: "",
 };
 
 export default function AddLeadDialog() {
@@ -49,14 +49,14 @@ export default function AddLeadDialog() {
     const ids = ativos.map((c) => c.id);
     const { data: counts } = await supabase
       .from("leads")
-      .select("corretor_responsavel")
-      .in("corretor_responsavel", ids)
+      .select("corretor_id")
+      .in("corretor_id", ids)
       .not("status", "eq", "perdido");
 
     const tally: Record<string, number> = {};
     for (const id of ids) tally[id] = 0;
     for (const r of counts || []) {
-      if (r.corretor_responsavel) tally[r.corretor_responsavel] = (tally[r.corretor_responsavel] || 0) + 1;
+      if (r.corretor_id) tally[r.corretor_id] = (tally[r.corretor_id] || 0) + 1;
     }
 
     // Pick the corretor with fewest leads
@@ -88,12 +88,12 @@ export default function AddLeadDialog() {
     if (form.vagas_desejado) payload.vagas_desejado = parseInt(form.vagas_desejado);
     if (form.prazo_decisao) payload.prazo_decisao = form.prazo_decisao;
 
-    if (form.corretor_responsavel) {
-      payload.corretor_responsavel = form.corretor_responsavel;
+    if (form.corretor_id) {
+      payload.corretor_id = form.corretor_id;
     } else {
       // Auto round-robin assignment
       const autoCorretor = await pickCorretorRoundRobin();
-      if (autoCorretor) payload.corretor_responsavel = autoCorretor;
+      if (autoCorretor) payload.corretor_id = autoCorretor;
     }
 
     const { error } = await supabase.from("leads").insert(payload as any);
@@ -242,7 +242,7 @@ export default function AddLeadDialog() {
           {corretores.filter((c) => c.ativo).length > 0 && (
             <div className="space-y-1">
               <Label className="text-xs">Corretor Responsável</Label>
-              <Select value={form.corretor_responsavel || "__auto__"} onValueChange={(v) => set("corretor_responsavel", v === "__auto__" ? "" : v)}>
+              <Select value={form.corretor_id || "__auto__"} onValueChange={(v) => set("corretor_id", v === "__auto__" ? "" : v)}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Distribuir automaticamente" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__auto__">Distribuir automaticamente</SelectItem>
