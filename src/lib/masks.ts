@@ -31,3 +31,13 @@ export function maskCEP(v: string): string {
   const d = v.replace(/\D/g, "").slice(0, 8);
   return d.replace(/(\d{5})(\d)/, "$1-$2");
 }
+
+export function maskMoney(v: string): string {
+  const digits = v.replace(/\D/g, "");
+  if (!digits) return "";
+  return parseInt(digits, 10).toLocaleString("pt-BR");
+}
+
+export function parseMoney(v: string): number {
+  return parseFloat(v.replace(/\./g, "").replace(",", ".")) || 0;
+}

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { maskPhone } from "@/lib/masks";
+import { useState, useEffect } from "react";
+import { maskPhone, maskMoney, parseMoney } from "@/lib/masks";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCorretores } from "@/hooks/useCorretores";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, CalendarCheck } from "lucide-react";
 
 const INITIAL = {
   nome: "",
@@ -20,13 +20,21 @@ const INITIAL = {
   mensagem_original: "",
   tipo_interesse: "",
   tipo_imovel: "",
-  valor_min: "",
-  valor_max: "",
-  quartos_desejado: "",
-  vagas_desejado: "",
+  valor_minimo: "",
+  valor_maximo: "",
+  quartos_desejados: "",
+  vagas_desejadas: "",
   prazo_decisao: "",
   origem_portal: "manual",
   corretor_id: "",
+};
+
+const VISITA_INITIAL = {
+  data_visita: "",
+  hora_visita: "",
+  imovel_id: "__none__",
+  tipo: "presencial",
+  observacoes: "",
 };
 
 export default function AddLeadDialog() {
@@ -36,8 +44,32 @@ export default function AddLeadDialog() {
   const { toast } = useToast();
   const { corretores } = useCorretores();
 
+  // Visit scheduling
+  const [agendarVisita, setAgendarVisita] = useState(false);
+  const [visitaForm, setVisitaForm] = useState(VISITA_INITIAL);
+  const [imoveis, setImoveis] = useState<{ id: string; titulo: string | null; tipo: string; endereco: string | null }[]>([]);
+
+  useEffect(() => {
+    if (!agendarVisita || !open) return;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session?.user) return;
+      supabase
+        .from("imoveis")
+        .select("id, titulo, tipo, endereco")
+        .eq("user_id", session.user.id)
+        .eq("status", "disponivel")
+        .order("created_at", { ascending: false })
+        .limit(200)
+        .then(({ data }) => setImoveis((data as any[]) || []));
+    });
+  }, [agendarVisita, open]);
+
   function set(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function setVisita(field: string, value: string) {
+    setVisitaForm((prev) => ({ ...prev, [field]: value }));
   }
 
   async function pickCorretorRoundRobin(): Promise<string | null> {
@@ -45,7 +77,6 @@ export default function AddLeadDialog() {
     if (ativos.length === 0) return null;
     if (ativos.length === 1) return ativos[0].id;
 
-    // Find which active corretor has the fewest open leads (balanced distribution)
     const ids = ativos.map((c) => c.id);
     const { data: counts } = await supabase
       .from("leads")
@@ -59,7 +90,6 @@ export default function AddLeadDialog() {
       if (r.corretor_id) tally[r.corretor_id] = (tally[r.corretor_id] || 0) + 1;
     }
 
-    // Pick the corretor with fewest leads
     return ids.reduce((a, b) => (tally[a] <= tally[b] ? a : b));
   }
 
@@ -69,11 +99,19 @@ export default function AddLeadDialog() {
       toast({ title: "Nome é obrigatório", variant: "destructive" });
       return;
     }
+    if (agendarVisita && (!visitaForm.data_visita || !visitaForm.hora_visita)) {
+      toast({ title: "Preencha data e hora da visita", variant: "destructive" });
+      return;
+    }
 
     setSaving(true);
+
+    // Determine initial status
+    const initialStatus = agendarVisita ? "visita_agendada" : "novo_lead";
+
     const payload: Record<string, any> = {
       nome: form.nome.trim(),
-      status: "novo_lead",
+      status: initialStatus,
       origem_portal: form.origem_portal || "manual",
     };
 
@@ -82,34 +120,63 @@ export default function AddLeadDialog() {
     if (form.mensagem_original.trim()) payload.mensagem_original = form.mensagem_original.trim();
     if (form.tipo_interesse) payload.tipo_interesse = form.tipo_interesse;
     if (form.tipo_imovel) payload.tipo_imovel = form.tipo_imovel;
-    if (form.valor_min) payload.valor_min = parseFloat(form.valor_min);
-    if (form.valor_max) payload.valor_max = parseFloat(form.valor_max);
-    if (form.quartos_desejado) payload.quartos_desejado = parseInt(form.quartos_desejado);
-    if (form.vagas_desejado) payload.vagas_desejado = parseInt(form.vagas_desejado);
+    if (form.valor_minimo) payload.valor_minimo = parseMoney(form.valor_minimo);
+    if (form.valor_maximo) payload.valor_maximo = parseMoney(form.valor_maximo);
+    if (form.quartos_desejados) payload.quartos_desejados = parseInt(form.quartos_desejados);
+    if (form.vagas_desejadas) payload.vagas_desejadas = parseInt(form.vagas_desejadas);
     if (form.prazo_decisao) payload.prazo_decisao = form.prazo_decisao;
 
     if (form.corretor_id) {
       payload.corretor_id = form.corretor_id;
     } else {
-      // Auto round-robin assignment
       const autoCorretor = await pickCorretorRoundRobin();
       if (autoCorretor) payload.corretor_id = autoCorretor;
     }
 
-    const { error } = await supabase.from("leads").insert(payload as any);
+    const { data: newLead, error } = await supabase
+      .from("leads")
+      .insert(payload as any)
+      .select("id")
+      .maybeSingle();
 
     if (error) {
       toast({ title: "Erro ao cadastrar lead", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Lead cadastrado com sucesso!" });
-      setForm(INITIAL);
-      setOpen(false);
+      setSaving(false);
+      return;
     }
+
+    // Create visit if scheduled
+    if (agendarVisita && newLead?.id) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { error: visitaError } = await supabase.from("agenda_visitas").insert({
+          lead_id: newLead.id,
+          user_id: session.user.id,
+          imovel_id: visitaForm.imovel_id !== "__none__" ? visitaForm.imovel_id : null,
+          corretor_id: payload.corretor_id || null,
+          data_visita: visitaForm.data_visita,
+          hora_visita: visitaForm.hora_visita,
+          duracao_minutos: 60,
+          tipo: visitaForm.tipo,
+          observacoes: visitaForm.observacoes || null,
+          status: "agendada",
+        } as any);
+        if (visitaError) {
+          toast({ title: "Lead criado, mas erro na visita", description: visitaError.message, variant: "destructive" });
+        }
+      }
+    }
+
+    toast({ title: agendarVisita ? "Lead criado com visita agendada!" : "Lead cadastrado com sucesso!" });
+    setForm(INITIAL);
+    setVisitaForm(VISITA_INITIAL);
+    setAgendarVisita(false);
+    setOpen(false);
     setSaving(false);
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setAgendarVisita(false); setVisitaForm(VISITA_INITIAL); } }}>
       <DialogTrigger asChild>
         <Button size="sm" className="gap-1.5">
           <Plus className="h-4 w-4" /> Novo Lead
@@ -128,7 +195,11 @@ export default function AddLeadDialog() {
             </div>
             <div className="space-y-1">
               <Label>Telefone / WhatsApp</Label>
-              <Input value={form.telefone} onChange={(e) => set("telefone", maskPhone(e.target.value))} placeholder="(11) 99999-9999" />
+              <Input
+                value={form.telefone}
+                onChange={(e) => set("telefone", maskPhone(e.target.value))}
+                placeholder="(11) 99999-9999"
+              />
             </div>
             <div className="space-y-1">
               <Label>Email</Label>
@@ -144,9 +215,10 @@ export default function AddLeadDialog() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Tipo de Interesse</Label>
-                <Select value={form.tipo_interesse} onValueChange={(v) => set("tipo_interesse", v)}>
+                <Select value={form.tipo_interesse || "__none__"} onValueChange={(v) => set("tipo_interesse", v === "__none__" ? "" : v)}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__none__">—</SelectItem>
                     {["Compra", "Aluguel", "Investimento", "Temporada"].map((v) => (
                       <SelectItem key={v} value={v}>{v}</SelectItem>
                     ))}
@@ -155,9 +227,10 @@ export default function AddLeadDialog() {
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Tipo de Imóvel</Label>
-                <Select value={form.tipo_imovel} onValueChange={(v) => set("tipo_imovel", v)}>
+                <Select value={form.tipo_imovel || "__none__"} onValueChange={(v) => set("tipo_imovel", v === "__none__" ? "" : v)}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__none__">—</SelectItem>
                     {["Apartamento", "Casa", "Terreno", "Sala Comercial", "Galpão", "Cobertura", "Studio"].map((v) => (
                       <SelectItem key={v} value={v}>{v}</SelectItem>
                     ))}
@@ -167,28 +240,27 @@ export default function AddLeadDialog() {
               <div className="space-y-1">
                 <Label className="text-xs">Valor mínimo (R$)</Label>
                 <Input
-                  type="number"
-                  value={form.valor_min}
-                  onChange={(e) => set("valor_min", e.target.value)}
-                  placeholder="300000"
+                  value={form.valor_minimo}
+                  onChange={(e) => set("valor_minimo", maskMoney(e.target.value))}
+                  placeholder="300.000"
                   className="h-8 text-xs"
                 />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Valor máximo (R$)</Label>
                 <Input
-                  type="number"
-                  value={form.valor_max}
-                  onChange={(e) => set("valor_max", e.target.value)}
-                  placeholder="600000"
+                  value={form.valor_maximo}
+                  onChange={(e) => set("valor_maximo", maskMoney(e.target.value))}
+                  placeholder="600.000"
                   className="h-8 text-xs"
                 />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Quartos desejados</Label>
-                <Select value={form.quartos_desejado} onValueChange={(v) => set("quartos_desejado", v)}>
+                <Select value={form.quartos_desejados || "__none__"} onValueChange={(v) => set("quartos_desejados", v === "__none__" ? "" : v)}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Qtd." /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__none__">—</SelectItem>
                     <SelectItem value="1">1</SelectItem>
                     <SelectItem value="2">2</SelectItem>
                     <SelectItem value="3">3</SelectItem>
@@ -198,9 +270,10 @@ export default function AddLeadDialog() {
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Vagas desejadas</Label>
-                <Select value={form.vagas_desejado} onValueChange={(v) => set("vagas_desejado", v)}>
+                <Select value={form.vagas_desejadas || "__none__"} onValueChange={(v) => set("vagas_desejadas", v === "__none__" ? "" : v)}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Qtd." /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__none__">—</SelectItem>
                     <SelectItem value="0">0</SelectItem>
                     <SelectItem value="1">1</SelectItem>
                     <SelectItem value="2">2</SelectItem>
@@ -210,9 +283,10 @@ export default function AddLeadDialog() {
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Prazo de Decisão</Label>
-                <Select value={form.prazo_decisao} onValueChange={(v) => set("prazo_decisao", v)}>
+                <Select value={form.prazo_decisao || "__none__"} onValueChange={(v) => set("prazo_decisao", v === "__none__" ? "" : v)}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Prazo..." /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__none__">—</SelectItem>
                     {["Imediato", "1 a 3 meses", "3 a 6 meses", "Mais de 6 meses"].map((v) => (
                       <SelectItem key={v} value={v}>{v}</SelectItem>
                     ))}
@@ -260,13 +334,89 @@ export default function AddLeadDialog() {
               value={form.mensagem_original}
               onChange={(e) => set("mensagem_original", e.target.value)}
               placeholder="Como o lead chegou, o que precisa, observações..."
-              rows={3}
+              rows={2}
             />
+          </div>
+
+          {/* Agendar Visita */}
+          <div className="border-t pt-3">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={agendarVisita}
+                onChange={(e) => setAgendarVisita(e.target.checked)}
+                className="h-4 w-4 rounded border-border accent-primary"
+              />
+              <span className="text-sm font-medium flex items-center gap-1.5">
+                <CalendarCheck className="h-4 w-4 text-primary" />
+                Já tem visita agendada?
+              </span>
+            </label>
+
+            {agendarVisita && (
+              <div className="mt-3 space-y-3 pl-1">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Data *</Label>
+                    <Input
+                      type="date"
+                      value={visitaForm.data_visita}
+                      onChange={(e) => setVisita("data_visita", e.target.value)}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Horário *</Label>
+                    <Input
+                      type="time"
+                      value={visitaForm.hora_visita}
+                      onChange={(e) => setVisita("hora_visita", e.target.value)}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Imóvel</Label>
+                  <Select value={visitaForm.imovel_id} onValueChange={(v) => setVisita("imovel_id", v)}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione o imóvel..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Sem imóvel vinculado</SelectItem>
+                      {imoveis.map((i) => (
+                        <SelectItem key={i.id} value={i.id}>
+                          {i.titulo || i.tipo}{i.endereco ? ` — ${i.endereco}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Tipo de Visita</Label>
+                  <Select value={visitaForm.tipo} onValueChange={(v) => setVisita("tipo", v)}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="presencial">Presencial</SelectItem>
+                      <SelectItem value="online">Online / Vídeo</SelectItem>
+                      <SelectItem value="drive-by">Drive-by</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Observações</Label>
+                  <Textarea
+                    value={visitaForm.observacoes}
+                    onChange={(e) => setVisita("observacoes", e.target.value)}
+                    rows={2}
+                    placeholder="Detalhes sobre a visita..."
+                    className="text-xs"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <Button type="submit" className="w-full" disabled={saving}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            {saving ? "Cadastrando..." : "Cadastrar Lead"}
+            {saving ? "Cadastrando..." : agendarVisita ? "Cadastrar Lead + Agendar Visita" : "Cadastrar Lead"}
           </Button>
         </form>
       </DialogContent>

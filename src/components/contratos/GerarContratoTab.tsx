@@ -78,14 +78,14 @@ export default function GerarContratoTab({ templates, onContratoGerado }: GerarC
   }, []);
 
   async function fetchLeadsImoveis() {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return;
     const [{ data: leadsData }, { data: imoveisData }] = await Promise.all([
       supabase.from("leads").select("id, nome, email, telefone").order("nome").limit(200),
       supabase
         .from("imoveis")
         .select("id, titulo, tipo, endereco, bairro, cidade, valor_venda, valor_aluguel, matricula, cartorio_registro, corretor:corretores(nome, creci)")
-        .eq("user_id", userData.user.id)
+        .eq("user_id", session.user.id)
         .order("created_at", { ascending: false })
         .limit(200),
     ]);

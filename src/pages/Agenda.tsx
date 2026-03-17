@@ -220,6 +220,15 @@ export default function Agenda() {
         const { error } = await supabase.from("agenda_visitas").insert(insertPayload);
         if (error) throw error;
         toast.success("Visita agendada!");
+
+        // Sync: advance lead to visita_agendada if still in early stage
+        if (editPayload.lead_id) {
+          await supabase
+            .from("leads")
+            .update({ status: "visita_agendada" } as any)
+            .eq("id", editPayload.lead_id)
+            .in("status", ["novo_lead", "contatado"]);
+        }
       }
 
       setDialogOpen(false);
