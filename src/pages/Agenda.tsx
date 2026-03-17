@@ -434,20 +434,20 @@ export default function Agenda() {
           <div className="space-y-3 py-2">
             <div className="space-y-1">
               <Label className="text-xs">Lead</Label>
-              <Select value={form.lead_id} onValueChange={(v) => setForm((f) => ({ ...f, lead_id: v }))}>
+              <Select value={form.lead_id || "__none__"} onValueChange={(v) => setForm((f) => ({ ...f, lead_id: v === "__none__" ? "" : v }))}>
                 <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Selecione o lead..." /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sem lead vinculado</SelectItem>
+                  <SelectItem value="__none__">Sem lead vinculado</SelectItem>
                   {leads.map((l) => <SelectItem key={l.id} value={l.id}>{l.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Imóvel</Label>
-              <Select value={form.imovel_id} onValueChange={(v) => setForm((f) => ({ ...f, imovel_id: v }))}>
+              <Select value={form.imovel_id || "__none__"} onValueChange={(v) => setForm((f) => ({ ...f, imovel_id: v === "__none__" ? "" : v }))}>
                 <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Selecione o imóvel..." /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sem imóvel vinculado</SelectItem>
+                  <SelectItem value="__none__">Sem imóvel vinculado</SelectItem>
                   {imoveis.map((i) => (
                     <SelectItem key={i.id} value={i.id}>
                       {i.titulo || i.tipo} — {i.endereco || "Sem endereço"}
@@ -458,10 +458,10 @@ export default function Agenda() {
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Corretor</Label>
-              <Select value={form.corretor_id} onValueChange={(v) => setForm((f) => ({ ...f, corretor_id: v }))}>
+              <Select value={form.corretor_id || "__none__"} onValueChange={(v) => setForm((f) => ({ ...f, corretor_id: v === "__none__" ? "" : v }))}>
                 <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sem corretor</SelectItem>
+                  <SelectItem value="__none__">Sem corretor</SelectItem>
                   {corretores.filter((c) => c.ativo).map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
                   ))}

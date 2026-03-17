@@ -948,17 +948,17 @@ function ComissoesTab() {
       {/* Filtros + botão */}
       <div className="flex flex-wrap gap-2 items-center justify-between">
         <div className="flex gap-2 flex-wrap">
-          <Select value={filtroCorretor} onValueChange={setFiltroCorretor}>
+          <Select value={filtroCorretor || "todos"} onValueChange={(v) => setFiltroCorretor(v === "todos" ? "" : v)}>
             <SelectTrigger className="w-44 h-8 text-xs"><SelectValue placeholder="Filtrar corretor" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos corretores</SelectItem>
+              <SelectItem value="todos">Todos corretores</SelectItem>
               {corretores.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+          <Select value={filtroStatus || "todos"} onValueChange={(v) => setFiltroStatus(v === "todos" ? "" : v)}>
             <SelectTrigger className="w-36 h-8 text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos</SelectItem>
+              <SelectItem value="todos">Todos</SelectItem>
               <SelectItem value="a_receber">A Receber</SelectItem>
               <SelectItem value="recebida">Recebida</SelectItem>
               <SelectItem value="cancelada">Cancelada</SelectItem>
@@ -1054,30 +1054,30 @@ function ComissoesTab() {
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Imóvel</Label>
-              <Select value={form.imovel_id} onValueChange={v => setForm(f => ({ ...f, imovel_id: v }))}>
+              <Select value={form.imovel_id || "__none__"} onValueChange={v => setForm(f => ({ ...f, imovel_id: v === "__none__" ? "" : v }))}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sem imóvel</SelectItem>
+                  <SelectItem value="__none__">Sem imóvel</SelectItem>
                   {imoveis.map(i => <SelectItem key={i.id} value={i.id}>{i.titulo || i.tipo} — {i.endereco || "Sem endereço"}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Lead / Cliente</Label>
-              <Select value={form.lead_id} onValueChange={v => setForm(f => ({ ...f, lead_id: v }))}>
+              <Select value={form.lead_id || "__none__"} onValueChange={v => setForm(f => ({ ...f, lead_id: v === "__none__" ? "" : v }))}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sem lead</SelectItem>
+                  <SelectItem value="__none__">Sem lead</SelectItem>
                   {leads.map(l => <SelectItem key={l.id} value={l.id}>{l.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Corretor</Label>
-              <Select value={form.corretor_id} onValueChange={v => setForm(f => ({ ...f, corretor_id: v }))}>
+              <Select value={form.corretor_id || "__none__"} onValueChange={v => setForm(f => ({ ...f, corretor_id: v === "__none__" ? "" : v }))}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sem corretor</SelectItem>
+                  <SelectItem value="__none__">Sem corretor</SelectItem>
                   {corretores.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
