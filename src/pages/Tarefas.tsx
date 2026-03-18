@@ -135,14 +135,6 @@ export default function Tarefas() {
   const getTarefasByStatus = useCallback((status: string, categoria?: string) =>
     tarefas.filter(t => t.status === status && (!categoria || t.categoria === categoria)), [tarefas]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
   const { pendentes, atrasadas, hojeCount, posVendaCount } = useMemo(() => {
     const pendentes = tarefas.filter(t => !t.concluida);
     const atrasadas = pendentes.filter(t => t.data_vencimento && isPast(new Date(t.data_vencimento + "T23:59:59")) && !isToday(new Date(t.data_vencimento + "T00:00:00")));
@@ -150,6 +142,14 @@ export default function Tarefas() {
     const posVendaCount = tarefas.filter(t => t.categoria === "pos_venda" && !t.concluida).length;
     return { pendentes, atrasadas, hojeCount, posVendaCount };
   }, [tarefas]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
