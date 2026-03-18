@@ -65,7 +65,7 @@ function maskBRL(value: string): string {
 
 export function CalculadoraFinanciamento({ valorImovelInicial, compact = false }: Props) {
   const initialValor = valorImovelInicial
-    ? (valorImovelInicial / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 })
+    ? valorImovelInicial.toLocaleString("pt-BR", { minimumFractionDigits: 2 })
     : "";
 
   const [valorStr, setValorStr] = useState(initialValor);

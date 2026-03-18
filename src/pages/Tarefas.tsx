@@ -48,13 +48,13 @@ export default function Tarefas() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const fetchTarefas = useCallback(async () => {
-    const { data: user } = await supabase.auth.getUser();
-    if (!user.user) { setLoading(false); return; }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) { setLoading(false); return; }
 
     const { data } = await supabase
       .from("tarefas")
       .select("*")
-      .eq("user_id", user.user.id)
+      .eq("user_id", session.user.id)
       .order("criado_em", { ascending: false });
 
     if (data) {

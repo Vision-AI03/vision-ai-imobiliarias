@@ -600,6 +600,8 @@ export default function Financeiro() {
                 handleExcluirCusto={handleExcluirCusto} handleEditarCusto={handleEditarCusto} />
             </TabsContent>
           </Tabs>
+
+          <EquipeKPISection />
         </TabsContent>
 
         {/* ============= COMISSÕES TAB ============= */}
@@ -796,6 +798,114 @@ function CustosSection({ custos, totalCusto, novoCustoOpen, setNovoCustoOpen, cu
   );
 }
 
+// ==================== PAINEL DE EQUIPE ====================
+function EquipeKPISection() {
+  const [kpis, setKpis] = useState<{ leads: number; visitas: number; vgv: number; comissoes: number } | null>(null);
+  const [ranking, setRanking] = useState<{ nome: string; comissao: number; qtd: number }[]>([]);
+  const [loadingKpi, setLoadingKpi] = useState(true);
+
+  useEffect(() => {
+    async function fetchEquipe() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setLoadingKpi(false); return; }
+
+      const now = new Date();
+      const inicioMes = startOfMonth(now).toISOString();
+      const fimMes = endOfMonth(now).toISOString();
+
+      const [leadsRes, visitasRes, comissoesRes] = await Promise.all([
+        supabase.from("leads").select("id", { count: "exact", head: true })
+          .eq("user_id", session.user.id)
+          .gte("criado_em", inicioMes).lte("criado_em", fimMes),
+        supabase.from("agenda_visitas").select("id", { count: "exact", head: true })
+          .eq("user_id", session.user.id)
+          .gte("data_hora", inicioMes).lte("data_hora", fimMes),
+        supabase.from("comissoes")
+          .select("valor_imovel, valor_comissao, corretor:corretores(nome)")
+          .eq("user_id", session.user.id)
+          .gte("created_at", inicioMes).lte("created_at", fimMes),
+      ]);
+
+      const comissoesList = comissoesRes.data || [];
+      const vgv = comissoesList.reduce((s: number, c: any) => s + (Number(c.valor_imovel) || 0), 0);
+      const totalComissoes = comissoesList.reduce((s: number, c: any) => s + (Number(c.valor_comissao) || 0), 0);
+
+      setKpis({
+        leads: leadsRes.count || 0,
+        visitas: visitasRes.count || 0,
+        vgv,
+        comissoes: totalComissoes,
+      });
+
+      // Ranking por corretor
+      const map: Record<string, { nome: string; comissao: number; qtd: number }> = {};
+      for (const c of comissoesList as any[]) {
+        const nome = c.corretor?.nome || "Sem corretor";
+        if (!map[nome]) map[nome] = { nome, comissao: 0, qtd: 0 };
+        map[nome].comissao += Number(c.valor_comissao) || 0;
+        map[nome].qtd += 1;
+      }
+      setRanking(Object.values(map).sort((a, b) => b.comissao - a.comissao));
+      setLoadingKpi(false);
+    }
+    fetchEquipe();
+  }, []);
+
+  if (loadingKpi) return null;
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Resumo da Equipe — Mês Atual</h3>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card className="glass-card"><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">Leads do mês</p>
+          <p className="text-2xl font-bold text-primary">{kpis?.leads ?? 0}</p>
+        </CardContent></Card>
+        <Card className="glass-card"><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">Visitas realizadas</p>
+          <p className="text-2xl font-bold text-accent">{kpis?.visitas ?? 0}</p>
+        </CardContent></Card>
+        <Card className="glass-card"><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">VGV fechado</p>
+          <p className="text-2xl font-bold">{formatCurrency(kpis?.vgv ?? 0)}</p>
+        </CardContent></Card>
+        <Card className="glass-card"><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">Total comissões</p>
+          <p className="text-2xl font-bold text-emerald-500">{formatCurrency(kpis?.comissoes ?? 0)}</p>
+        </CardContent></Card>
+      </div>
+
+      {ranking.length > 0 && (
+        <Card className="glass-card">
+          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><User className="h-4 w-4 text-primary" />Ranking de Corretores</CardTitle></CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs w-8">#</TableHead>
+                  <TableHead className="text-xs">Corretor</TableHead>
+                  <TableHead className="text-xs text-right">Negócios</TableHead>
+                  <TableHead className="text-xs text-right">Comissões</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {ranking.map((r, i) => (
+                  <TableRow key={r.nome}>
+                    <TableCell className="text-xs font-bold text-muted-foreground">{i + 1}</TableCell>
+                    <TableCell className="text-xs font-medium">{r.nome}</TableCell>
+                    <TableCell className="text-xs text-right">{r.qtd}</TableCell>
+                    <TableCell className="text-xs text-right font-semibold text-primary">{formatCurrency(r.comissao)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 // ==================== ABA DE COMISSÕES ====================
 function ComissoesTab() {
   const { toast } = useToast();
@@ -853,9 +963,9 @@ function ComissoesTab() {
   }
 
   function calcComissao(valor: string, pct: string) {
-    const v = parseFloat(valor) || 0;
+    const v = parseMoney(valor);
     const p = parseFloat(pct) || 0;
-    return ((v * p) / 100).toFixed(2);
+    return ((v * p) / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
   }
 
   async function handleSave() {
@@ -966,25 +1076,6 @@ function ComissoesTab() {
           <p className="text-xl font-bold">{filtered.length}</p>
         </CardContent></Card>
       </div>
-
-      {/* Gráfico ranking */}
-      {rankingData.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Ranking de Comissões por Corretor (recebidas)</CardTitle></CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={Math.max(120, rankingData.length * 60)}>
-              <BarChart data={rankingData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" className="opacity-20" />
-                <XAxis type="number" tick={{ fontSize: 10 }} domain={[0, maxComissao * 1.3]}
-                  tickFormatter={v => maxComissao >= 10000 ? `R$${(v/1000).toFixed(0)}k` : `R$${v.toLocaleString("pt-BR")}`} />
-                <YAxis type="category" dataKey="nome" tick={{ fontSize: 11 }} width={90} />
-                <Tooltip formatter={(v: any) => [formatCurrency(v), "Comissão"]} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
-                <Bar dataKey="valor" fill="hsl(var(--primary))" radius={[0, 3, 3, 0]} barSize={32} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Filtros + botão */}
       <div className="flex flex-wrap gap-2 items-center justify-between">
@@ -1141,8 +1232,8 @@ function ComissoesTab() {
               <Select value={form.imovel_id || "__none__"} onValueChange={v => {
                 const imovelId = v === "__none__" ? "" : v;
                 const imovel = imoveis.find(i => i.id === imovelId);
-                const autoValor = imovel ? (imovel.valor_venda || imovel.valor_aluguel || "") : "";
-                const valorStr = autoValor ? autoValor.toString() : "";
+                const autoValor = imovel ? (imovel.valor_venda || imovel.valor_aluguel || null) : null;
+                const valorStr = autoValor != null ? autoValor.toLocaleString("pt-BR") : "";
                 const comissao = valorStr ? calcComissao(valorStr, form.percentual_comissao) : form.valor_comissao;
                 setForm(f => ({ ...f, imovel_id: imovelId, valor_imovel: valorStr || f.valor_imovel, valor_comissao: valorStr ? comissao : f.valor_comissao }));
               }}>
@@ -1176,11 +1267,11 @@ function ComissoesTab() {
             <div className="grid grid-cols-3 gap-2">
               <div className="space-y-1 col-span-2">
                 <Label className="text-xs">Valor do Imóvel (R$)</Label>
-                <Input type="number" value={form.valor_imovel} onChange={e => {
+                <Input type="text" value={form.valor_imovel} onChange={e => {
                   const v = e.target.value;
                   const comissao = calcComissao(v, form.percentual_comissao);
                   setForm(f => ({ ...f, valor_imovel: v, valor_comissao: comissao }));
-                }} className="h-8 text-xs" placeholder="500000" />
+                }} className="h-8 text-xs" placeholder="500.000" />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">% Comissão</Label>
@@ -1193,7 +1284,7 @@ function ComissoesTab() {
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Valor da Comissão (R$) — calculado automaticamente</Label>
-              <Input type="number" value={form.valor_comissao} onChange={e => setForm(f => ({ ...f, valor_comissao: e.target.value }))} className="h-8 text-xs font-semibold text-primary" />
+              <Input type="text" value={form.valor_comissao} onChange={e => setForm(f => ({ ...f, valor_comissao: e.target.value }))} className="h-8 text-xs font-semibold text-primary" />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
