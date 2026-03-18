@@ -82,7 +82,7 @@ export default function Imoveis() {
             Imóveis
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {imoveis.length} imóvel{imoveis.length !== 1 ? "is" : ""} · {disponiveisCount} disponível{disponiveisCount !== 1 ? "is" : ""}
+            {imoveis.length !== 1 ? `${imoveis.length} imóveis` : "1 imóvel"} · {disponiveisCount !== 1 ? `${disponiveisCount} disponíveis` : "1 disponível"}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
