@@ -15,7 +15,7 @@ import {
   LineChart, Line, Legend,
 } from "recharts";
 import {
-  format, startOfMonth, endOfMonth, subMonths, startOfWeek, addDays,
+  format, startOfMonth, endOfMonth, startOfWeek, addDays,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -89,10 +89,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchDashboard();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchDashboard() {
     setLoading(true);
+    try {
     const now = new Date();
     const today = format(now, "yyyy-MM-dd");
     const mesInicio = startOfMonth(now).toISOString();
@@ -172,29 +173,43 @@ export default function Dashboard() {
     setLeadsRecentes((leadsRecentesRes.data as LeadRecente[]) || []);
     setTarefasHoje((tarefasRes.data as TarefaHoje[]) || []);
 
-    // Gráfico — leads por semana (últimas 8 semanas)
-    const semanas: { semana: string; leads: number }[] = [];
-    for (let i = 7; i >= 0; i--) {
-      const inicio = format(subMonths(startOfWeek(now, { weekStartsOn: 1 }), 0), "yyyy-MM-dd");
+    // Gráfico — leads por semana (últimas 8 semanas) — queries em paralelo
+    const semanaRanges = Array.from({ length: 8 }, (_, idx) => {
+      const i = 7 - idx;
       const semanaIdx = addDays(startOfWeek(now, { weekStartsOn: 1 }), -i * 7);
-      const fimSemana = addDays(semanaIdx, 6);
-      const { count } = await supabase
-        .from("leads")
-        .select("id", { count: "exact", head: true })
-        .gte("criado_em", semanaIdx.toISOString())
-        .lte("criado_em", fimSemana.toISOString());
-      semanas.push({
-        semana: format(semanaIdx, "dd/MM", { locale: ptBR }),
-        leads: count || 0,
-      });
-    }
+      return { semanaIdx, fimSemana: addDays(semanaIdx, 6) };
+    });
+
+    const semanaCounts = await Promise.all(
+      semanaRanges.map(({ semanaIdx, fimSemana }) =>
+        supabase
+          .from("leads")
+          .select("id", { count: "exact", head: true })
+          .gte("criado_em", semanaIdx.toISOString())
+          .lte("criado_em", fimSemana.toISOString())
+      )
+    );
+
+    const semanas = semanaRanges.map(({ semanaIdx }, idx) => ({
+      semana: format(semanaIdx, "dd/MM", { locale: ptBR }),
+      leads: semanaCounts[idx].count || 0,
+    }));
     setWeeklyLeadsData(semanas);
 
-    setLoading(false);
+    } catch (err) {
+      console.error("Erro ao carregar dashboard:", err);
+      toast({ title: "Erro ao carregar dashboard", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleToggleTarefa(id: string) {
-    await supabase.from("tarefas").update({ concluida: true, status: "feito" }).eq("id", id);
+    const { error } = await supabase.from("tarefas").update({ concluida: true, status: "feito" }).eq("id", id);
+    if (error) {
+      toast({ title: "Erro ao concluir tarefa", variant: "destructive" });
+      return;
+    }
     setTarefasHoje(prev => prev.filter(t => t.id !== id));
     toast({ title: "Tarefa concluída!" });
   }

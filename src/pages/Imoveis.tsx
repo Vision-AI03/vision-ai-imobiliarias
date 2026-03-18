@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useImoveis, Imovel } from "@/hooks/useImoveis";
 import { ImovelCard } from "@/components/imoveis/ImovelCard";
 import { ImovelFormDialog } from "@/components/imoveis/ImovelFormDialog";
@@ -70,7 +70,14 @@ export default function Imoveis() {
   const clearFilters = () => setFilters({ tipo: "", finalidade: "", status: "", busca: "" });
   const hasFilters = filters.tipo || filters.finalidade || filters.status || filters.busca;
 
-  const disponiveisCount = imoveis.filter((i) => i.status === "disponivel").length;
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const i of imoveis) {
+      counts[i.status] = (counts[i.status] || 0) + 1;
+    }
+    return counts;
+  }, [imoveis]);
+  const disponiveisCount = statusCounts["disponivel"] || 0;
 
   return (
     <div className="p-6 space-y-5">
@@ -179,7 +186,7 @@ export default function Imoveis() {
       {/* Stats rápidas */}
       <div className="flex gap-2 flex-wrap">
         {["disponivel", "reservado", "vendido", "alugado"].map((s) => {
-          const count = imoveis.filter((i) => i.status === s).length;
+          const count = statusCounts[s] || 0;
           if (!count) return null;
           return (
             <Badge key={s} variant="outline" className="text-xs">

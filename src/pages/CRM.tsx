@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   DndContext, DragEndEvent, DragOverEvent, DragOverlay, DragStartEvent,
   PointerSensor, useSensor, useSensors, closestCorners,
@@ -66,7 +66,12 @@ export default function CRM() {
   );
 
   const fetchLeads = useCallback(async () => {
-    const { data } = await supabase.from("leads").select("*").order("criado_em", { ascending: false });
+    const { data, error } = await supabase
+      .from("leads")
+      .select("*")
+      .order("criado_em", { ascending: false })
+      .limit(500);
+    if (error) console.error("Erro ao buscar leads:", error);
     setLeads(data || []);
     setLoading(false);
   }, []);
@@ -88,14 +93,22 @@ export default function CRM() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchLeads]);
 
+  const leadsByStatus = useMemo(() => {
+    const map: Record<string, Lead[]> = {};
+    for (const col of COLUNAS) {
+      map[col.id] = leads.filter(l => {
+        if ((l.status || "novo_lead") !== col.id) return false;
+        if (filterMeus && currentUserId) {
+          return (l as any).corretor_responsavel === currentUserId;
+        }
+        return true;
+      });
+    }
+    return map;
+  }, [leads, filterMeus, currentUserId]);
+
   function getLeadsByStatus(status: string) {
-    return leads.filter(l => {
-      if ((l.status || "novo_lead") !== status) return false;
-      if (filterMeus && currentUserId) {
-        return (l as any).corretor_responsavel === currentUserId;
-      }
-      return true;
-    });
+    return leadsByStatus[status] || [];
   }
 
   function handleDragStart(event: DragStartEvent) {

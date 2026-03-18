@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import LeadCard from "./LeadCard";
@@ -12,7 +13,7 @@ interface KanbanColumnProps {
   onLeadClick: (lead: Lead) => void;
 }
 
-export default function KanbanColumn({ id, title, leads, onLeadClick }: KanbanColumnProps) {
+const KanbanColumn = memo(function KanbanColumn({ id, title, leads, onLeadClick }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
@@ -39,4 +40,6 @@ export default function KanbanColumn({ id, title, leads, onLeadClick }: KanbanCo
       </div>
     </div>
   );
-}
+});
+
+export default KanbanColumn;

@@ -131,7 +131,7 @@ export default function HotsiteCorretor() {
       ? `Interesse no imóvel: ${selectedImovel.titulo || selectedImovel.tipo} (${selectedImovel.codigo || selectedImovel.id})\n\n${form.mensagem}`
       : form.mensagem;
 
-    await supabase.from("leads").insert({
+    const { error } = await supabase.from("leads").insert({
       user_id: corretor.admin_id,
       nome: form.nome,
       telefone: form.telefone,
@@ -143,6 +143,12 @@ export default function HotsiteCorretor() {
       corretor_responsavel: corretor.id,
       imoveis_interesse: selectedImovel ? [selectedImovel.id] : null,
     });
+
+    if (error) {
+      alert("Erro ao enviar mensagem. Tente novamente.");
+      setSubmitting(false);
+      return;
+    }
 
     setSubmitted(true);
     setSubmitting(false);
@@ -215,7 +221,7 @@ export default function HotsiteCorretor() {
                 style={{ backgroundColor: primary }}
               >
                 {corretor.foto_url ? (
-                  <img src={corretor.foto_url} alt={corretor.nome} className="w-full h-full object-cover" />
+                  <img src={corretor.foto_url} alt={corretor.nome} loading="lazy" width={80} height={80} className="w-full h-full object-cover" />
                 ) : (
                   corretor.nome.charAt(0).toUpperCase()
                 )}
@@ -310,6 +316,9 @@ export default function HotsiteCorretor() {
                         <img
                           src={imovel.foto_destaque}
                           alt={imovel.titulo || imovel.tipo}
+                          loading="lazy"
+                          width={400}
+                          height={160}
                           className="w-full h-full object-cover"
                         />
                       ) : (

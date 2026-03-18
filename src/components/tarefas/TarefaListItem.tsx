@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ interface Props {
   onDelete: (id: string) => void;
 }
 
-export function TarefaListItem({ tarefa, onToggle, onEdit, onDelete }: Props) {
+export const TarefaListItem = memo(function TarefaListItem({ tarefa, onToggle, onEdit, onDelete }: Props) {
   const isOverdue = tarefa.data_vencimento && !tarefa.concluida &&
     isPast(new Date(tarefa.data_vencimento + "T23:59:59")) &&
     !isToday(new Date(tarefa.data_vencimento + "T00:00:00"));
@@ -62,4 +63,4 @@ export function TarefaListItem({ tarefa, onToggle, onEdit, onDelete }: Props) {
       </div>
     </div>
   );
-}
+});

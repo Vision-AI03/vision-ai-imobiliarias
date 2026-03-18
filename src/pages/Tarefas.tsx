@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -129,8 +129,11 @@ export default function Tarefas() {
     setDialogOpen(true);
   };
 
-  const getTarefasByStatus = (status: string, categoria?: string) =>
-    tarefas.filter(t => t.status === status && (!categoria || t.categoria === categoria));
+  const tarefasSemPosVenda = useMemo(() => tarefas.filter(t => t.categoria !== "pos_venda"), [tarefas]);
+  const tarefasPosVenda = useMemo(() => tarefas.filter(t => t.categoria === "pos_venda"), [tarefas]);
+
+  const getTarefasByStatus = useCallback((status: string, categoria?: string) =>
+    tarefas.filter(t => t.status === status && (!categoria || t.categoria === categoria)), [tarefas]);
 
   if (loading) {
     return (
@@ -140,10 +143,13 @@ export default function Tarefas() {
     );
   }
 
-  const pendentes = tarefas.filter(t => !t.concluida);
-  const atrasadas = pendentes.filter(t => t.data_vencimento && isPast(new Date(t.data_vencimento + "T23:59:59")) && !isToday(new Date(t.data_vencimento + "T00:00:00")));
-  const hojeCount = pendentes.filter(t => t.data_vencimento && isToday(new Date(t.data_vencimento + "T00:00:00"))).length;
-  const posVendaCount = tarefas.filter(t => t.categoria === "pos_venda" && !t.concluida).length;
+  const { pendentes, atrasadas, hojeCount, posVendaCount } = useMemo(() => {
+    const pendentes = tarefas.filter(t => !t.concluida);
+    const atrasadas = pendentes.filter(t => t.data_vencimento && isPast(new Date(t.data_vencimento + "T23:59:59")) && !isToday(new Date(t.data_vencimento + "T00:00:00")));
+    const hojeCount = pendentes.filter(t => t.data_vencimento && isToday(new Date(t.data_vencimento + "T00:00:00"))).length;
+    const posVendaCount = tarefas.filter(t => t.categoria === "pos_venda" && !t.concluida).length;
+    return { pendentes, atrasadas, hojeCount, posVendaCount };
+  }, [tarefas]);
 
   return (
     <div className="space-y-6">
@@ -215,10 +221,10 @@ export default function Tarefas() {
           ) : (
             <Card className="glass-card">
               <CardContent className="p-4 space-y-1">
-                {tarefas.filter(t => t.categoria !== "pos_venda").length === 0 ? (
+                {tarefasSemPosVenda.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-8 text-center">Nenhuma tarefa criada ainda.</p>
                 ) : (
-                  tarefas.filter(t => t.categoria !== "pos_venda").map(t => (
+                  tarefasSemPosVenda.map(t => (
                     <TarefaListItem key={t.id} tarefa={t} onToggle={handleToggleConcluida} onEdit={handleEdit} onDelete={handleDelete} />
                   ))
                 )}
@@ -238,7 +244,7 @@ export default function Tarefas() {
             </div>
           </div>
 
-          {tarefas.filter(t => t.categoria === "pos_venda").length === 0 ? (
+          {tarefasPosVenda.length === 0 ? (
             <Card className="glass-card">
               <CardContent className="p-10 text-center text-muted-foreground">
                 <Heart className="h-12 w-12 mx-auto mb-3 opacity-20" />
@@ -250,10 +256,10 @@ export default function Tarefas() {
             <div className="space-y-2">
               {/* Group by lead */}
               {Array.from(
-                new Set(tarefas.filter(t => t.categoria === "pos_venda").map(t => t.lead_nome || t.lead_id || "—"))
+                new Set(tarefasPosVenda.map(t => t.lead_nome || t.lead_id || "—"))
               ).map(leadNome => {
-                const leadTarefas = tarefas.filter(
-                  t => t.categoria === "pos_venda" && (t.lead_nome || t.lead_id || "—") === leadNome
+                const leadTarefas = tarefasPosVenda.filter(
+                  t => (t.lead_nome || t.lead_id || "—") === leadNome
                 ).sort((a, b) => (a.data_vencimento || "").localeCompare(b.data_vencimento || ""));
                 const done = leadTarefas.filter(t => t.concluida).length;
                 const progress = Math.round((done / leadTarefas.length) * 100);

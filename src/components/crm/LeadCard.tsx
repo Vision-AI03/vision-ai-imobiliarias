@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +30,7 @@ function getPrioridadeBadge(prioridade: string | null) {
   }
 }
 
-export default function LeadCard({ lead, onClick }: LeadCardProps) {
+const LeadCard = memo(function LeadCard({ lead, onClick }: LeadCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: lead.id,
     data: { lead },
@@ -116,4 +117,6 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
       )}
     </div>
   );
-}
+});
+
+export default LeadCard;

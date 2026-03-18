@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ interface Props {
   isDragging?: boolean;
 }
 
-export function TarefaCard({ tarefa, onEdit, onDelete, onToggle, isDragging }: Props) {
+export const TarefaCard = memo(function TarefaCard({ tarefa, onEdit, onDelete, onToggle, isDragging }: Props) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: tarefa.id });
 
   const style = transform ? { transform: `translate(${transform.x}px, ${transform.y}px)` } : undefined;
@@ -80,4 +81,4 @@ export function TarefaCard({ tarefa, onEdit, onDelete, onToggle, isDragging }: P
       </div>
     </div>
   );
-}
+});

@@ -50,8 +50,6 @@ export function PlataformaProvider({ children }: { children: ReactNode }) {
       .eq("user_id", userId)
       .maybeSingle();
 
-    console.log("[PlataformaContext] fetchConfig userId:", userId, "data:", data);
-
     if (data) {
       setConfig({
         nome_plataforma: data.nome_plataforma || defaults.nome_plataforma,

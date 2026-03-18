@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { Imovel } from "@/hooks/useImoveis";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ interface Props {
   onEdit: (imovel: Imovel) => void;
 }
 
-export function ImovelCard({ imovel, onEdit }: Props) {
+export const ImovelCard = memo(function ImovelCard({ imovel, onEdit }: Props) {
   const navigate = useNavigate();
   const [calcOpen, setCalcOpen] = useState(false);
   const status = statusConfig[imovel.status] || statusConfig.inativo;
@@ -43,6 +43,9 @@ export function ImovelCard({ imovel, onEdit }: Props) {
           <img
             src={imovel.foto_destaque}
             alt={imovel.titulo || "Imóvel"}
+            loading="lazy"
+            width={400}
+            height={176}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
@@ -178,4 +181,4 @@ export function ImovelCard({ imovel, onEdit }: Props) {
       </Dialog>
     </Card>
   );
-}
+});
