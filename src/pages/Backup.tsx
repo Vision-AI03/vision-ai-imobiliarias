@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Download, ShieldAlert, Loader2 } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
 import JSZip from "jszip";
 import { format } from "date-fns";
 
@@ -46,7 +45,7 @@ export default function Backup() {
     {
       id: "leads",
       label: "Leads",
-      description: "Todos os leads do CRM",
+      description: "Todos os leads do CRM com campos imobiliários",
       filename: "leads",
       fetch: async () => {
         const { data } = await supabase.from("leads").select("*");
@@ -54,90 +53,62 @@ export default function Backup() {
       },
     },
     {
-      id: "comunicacoes",
-      label: "Comunicações",
-      description: "comunicacoes + email_contatos",
-      filename: "comunicacoes",
+      id: "imoveis",
+      label: "Imóveis",
+      description: "Carteira de imóveis completa",
+      filename: "imoveis",
       fetch: async () => {
-        const [r1, r2] = await Promise.all([
-          supabase.from("comunicacoes").select("*"),
-          supabase.from("email_contatos").select("*"),
-        ]);
-        return [
-          ...((r1.data || []) as Record<string, unknown>[]),
-          ...((r2.data || []) as Record<string, unknown>[]),
-        ];
+        const { data } = await supabase.from("imoveis").select("*");
+        return (data || []) as Record<string, unknown>[];
       },
     },
     {
-      id: "contratos",
-      label: "Contratos",
-      description: "contratos + contratos_gerados",
-      filename: "contratos",
+      id: "visitas",
+      label: "Visitas",
+      description: "Histórico de agenda de visitas",
+      filename: "visitas",
       fetch: async () => {
-        const [r1, r2] = await Promise.all([
-          supabase.from("contratos").select("*"),
-          supabase.from("contratos_gerados").select("*"),
-        ]);
-        return [
-          ...((r1.data || []) as Record<string, unknown>[]),
-          ...((r2.data || []) as Record<string, unknown>[]),
-        ];
+        const { data } = await supabase.from("agenda_visitas").select("*");
+        return (data || []) as Record<string, unknown>[];
+      },
+    },
+    {
+      id: "corretores",
+      label: "Corretores",
+      description: "Equipe cadastrada",
+      filename: "corretores",
+      fetch: async () => {
+        const { data } = await supabase.from("corretores").select("*");
+        return (data || []) as Record<string, unknown>[];
+      },
+    },
+    {
+      id: "comissoes",
+      label: "Comissões",
+      description: "Histórico financeiro de comissões",
+      filename: "comissoes",
+      fetch: async () => {
+        const { data } = await supabase.from("comissoes").select("*");
+        return (data || []) as Record<string, unknown>[];
+      },
+    },
+    {
+      id: "contratos_gerados",
+      label: "Contratos Gerados",
+      description: "Contratos preenchidos pela IA",
+      filename: "contratos_gerados",
+      fetch: async () => {
+        const { data } = await supabase.from("contratos_gerados").select("*");
+        return (data || []) as Record<string, unknown>[];
       },
     },
     {
       id: "tarefas",
       label: "Tarefas",
-      description: "Todas as tarefas",
+      description: "Tarefas e atividades",
       filename: "tarefas",
       fetch: async () => {
         const { data } = await supabase.from("tarefas").select("*");
-        return (data || []) as Record<string, unknown>[];
-      },
-    },
-    {
-      id: "financeiro_empresa",
-      label: "Financeiro — Empresa",
-      description: "parcelas + recorrencias + custos empresa",
-      filename: "financeiro_empresa",
-      fetch: async () => {
-        const [r1, r2, r3] = await Promise.all([
-          supabase.from("parcelas").select("*"),
-          supabase.from("recorrencias").select("*"),
-          supabase.from("custos").select("*").or("escopo.eq.empresa,escopo.is.null"),
-        ]);
-        return [
-          ...((r1.data || []) as Record<string, unknown>[]),
-          ...((r2.data || []) as Record<string, unknown>[]),
-          ...((r3.data || []) as Record<string, unknown>[]),
-        ];
-      },
-    },
-    {
-      id: "financeiro_pessoal",
-      label: "Financeiro — Pessoal",
-      description: "transacoes_pessoais + custos pessoal",
-      filename: "financeiro_pessoal",
-      fetch: async () => {
-        const [r1, r2] = await Promise.all([
-          supabase.from("transacoes_pessoais").select("*"),
-          supabase.from("custos").select("*").eq("escopo", "pessoal"),
-        ]);
-        return [
-          ...((r1.data || []) as Record<string, unknown>[]),
-          ...((r2.data || []) as Record<string, unknown>[]),
-        ];
-      },
-    },
-    {
-      id: "credenciais",
-      label: "Credenciais",
-      description: "Todos os dados incluindo valores das chaves",
-      filename: "credenciais",
-      fetch: async () => {
-        const { data } = await supabase
-          .from("credentials")
-          .select("*");
         return (data || []) as Record<string, unknown>[];
       },
     },
@@ -201,13 +172,6 @@ export default function Backup() {
         <h1 className="text-2xl font-bold">Exportação / Backup de Dados</h1>
         <p className="text-muted-foreground">Exporte seus dados em CSV ou JSON para backup ou análise externa.</p>
       </div>
-
-      <Alert variant="destructive">
-        <ShieldAlert className="h-4 w-4" />
-        <AlertDescription>
-          <strong>Atenção:</strong> As credenciais são exportadas <strong>com os valores das chaves</strong>. Mantenha o arquivo de backup em local seguro e não compartilhe com terceiros.
-        </AlertDescription>
-      </Alert>
 
       <Card>
         <CardHeader>

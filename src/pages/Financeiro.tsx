@@ -941,6 +941,7 @@ function ComissoesTab() {
     .map(([nome, valor]) => ({ nome, valor }))
     .sort((a, b) => b.valor - a.valor)
     .slice(0, 10);
+  const maxComissao = rankingData.length > 0 ? Math.max(...rankingData.map(d => d.valor)) : 0;
 
   if (loading) return <div className="flex items-center justify-center py-12"><div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
 
@@ -971,13 +972,14 @@ function ComissoesTab() {
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Ranking de Comissões por Corretor (recebidas)</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={180}>
+            <ResponsiveContainer width="100%" height={Math.max(120, rankingData.length * 60)}>
               <BarChart data={rankingData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" className="opacity-20" />
-                <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
+                <XAxis type="number" tick={{ fontSize: 10 }} domain={[0, maxComissao * 1.3]}
+                  tickFormatter={v => maxComissao >= 10000 ? `R$${(v/1000).toFixed(0)}k` : `R$${v.toLocaleString("pt-BR")}`} />
                 <YAxis type="category" dataKey="nome" tick={{ fontSize: 11 }} width={90} />
                 <Tooltip formatter={(v: any) => [formatCurrency(v), "Comissão"]} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
-                <Bar dataKey="valor" fill="hsl(var(--primary))" radius={[0, 3, 3, 0]} />
+                <Bar dataKey="valor" fill="hsl(var(--primary))" radius={[0, 3, 3, 0]} barSize={32} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
