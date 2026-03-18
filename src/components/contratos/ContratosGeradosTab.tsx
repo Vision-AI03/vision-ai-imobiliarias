@@ -137,7 +137,7 @@ export default function ContratosGeradosTab({ contratos, templates, onRefresh }:
               <TableHeader>
                 <TableRow>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>Template</TableHead>
+                  <TableHead>Modelo</TableHead>
                   <TableHead>Valor</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Data</TableHead>

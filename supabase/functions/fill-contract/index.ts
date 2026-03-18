@@ -5,13 +5,65 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Extract readable text from a standard (digitally-created) PDF binary
+function extractTextFromPDF(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const text = new TextDecoder("latin1").decode(bytes);
+  const parts: string[] = [];
+
+  const btEtBlocks = text.match(/BT[\s\S]*?ET/g) || [];
+  for (const block of btEtBlocks) {
+    // (text) Tj
+    const tjMatches = block.match(/\(([^)]*)\)\s*Tj/g) || [];
+    for (const m of tjMatches) {
+      const str = m.replace(/^\(/, "").replace(/\)\s*Tj$/, "").trim();
+      if (str && /[a-zA-ZÀ-ú0-9]/.test(str)) parts.push(str);
+    }
+    // [(text)...] TJ
+    const tjArrMatches = block.match(/\[([^\]]*)\]\s*TJ/g) || [];
+    for (const m of tjArrMatches) {
+      const inner = m.replace(/\[/, "").replace(/\]\s*TJ$/, "");
+      const strParts = inner.match(/\(([^)]*)\)/g) || [];
+      for (const sp of strParts) {
+        const str = sp.replace(/^\(/, "").replace(/\)$/, "").trim();
+        if (str && /[a-zA-ZÀ-ú0-9]/.test(str)) parts.push(str);
+      }
+    }
+  }
+
+  return parts.join(" ").replace(/\s+/g, " ").trim();
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, template_content, action } = await req.json();
+    const { messages, template_content, pdf_url, action } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    let resolvedContent = template_content as string;
+
+    // If this is a PDF template and the stored content is just a placeholder,
+    // download the file and extract text server-side
+    if (
+      action === "fill_contract" &&
+      pdf_url &&
+      (!resolvedContent || resolvedContent.startsWith("["))
+    ) {
+      try {
+        const fileRes = await fetch(pdf_url);
+        if (fileRes.ok) {
+          const buffer = await fileRes.arrayBuffer();
+          const extracted = extractTextFromPDF(buffer);
+          if (extracted.length > 50) {
+            resolvedContent = extracted;
+          }
+        }
+      } catch (fetchErr) {
+        console.warn("Could not fetch PDF for text extraction:", fetchErr);
+      }
+    }
 
     let systemPrompt = "";
 
@@ -21,7 +73,7 @@ serve(async (req) => {
 Seu papel: receber o texto de um modelo de contrato (extraído de PDF ou DOCX) junto com dados do imóvel, cliente e imobiliária, e retornar o contrato com todos os campos em branco devidamente preenchidos.
 
 MODELO DO CONTRATO:
-${template_content}
+${resolvedContent}
 
 REGRAS:
 - Preencha TODOS os campos em branco com os dados fornecidos. Campos em branco incluem: {{placeholders}}, espaços ___, [CAMPO], (campo), linhas de assinatura, etc.
@@ -105,7 +157,7 @@ REGRAS:
     }
 
     const result = await response.json();
-    
+
     if (action === "extract_data") {
       const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
       if (toolCall) {

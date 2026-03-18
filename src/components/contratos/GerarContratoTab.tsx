@@ -63,6 +63,10 @@ function renderPreview(text: string) {
   );
 }
 
+function isPdfTemplate(template: Template): boolean {
+  return template.arquivo_tipo === "pdf";
+}
+
 export default function GerarContratoTab({ templates, onContratoGerado }: GerarContratoTabProps) {
   const { toast } = useToast();
   const { config } = useConfiguracoesSistema();
@@ -81,16 +85,33 @@ export default function GerarContratoTab({ templates, onContratoGerado }: GerarC
 
   async function fetchLeadsImoveis() {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return;
-    const [{ data: leadsData }, { data: imoveisData }] = await Promise.all([
-      supabase.from("leads").select("id, nome, email, telefone").order("nome").limit(200),
+    const userId = session?.user?.id;
+    if (!userId) return;
+
+    const [
+      { data: leadsData, error: leadsErr },
+      { data: imoveisData, error: imoveisErr },
+    ] = await Promise.all([
+      supabase
+        .from("leads")
+        .select("id, nome, email, telefone")
+        .order("nome")
+        .limit(200),
       supabase
         .from("imoveis")
         .select("id, titulo, tipo, endereco, bairro, cidade, valor_venda, valor_aluguel, matricula, cartorio_registro, corretor:corretores(nome, creci)")
-        .eq("user_id", session.user.id)
+        .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(200),
     ]);
+
+    if (leadsErr) {
+      toast({ title: "Erro ao carregar leads", description: leadsErr.message, variant: "destructive" });
+    }
+    if (imoveisErr) {
+      toast({ title: "Erro ao carregar imóveis", description: imoveisErr.message, variant: "destructive" });
+    }
+
     setLeads((leadsData as Lead[]) || []);
     setImoveis((imoveisData as unknown as Imovel[]) || []);
   }
@@ -101,14 +122,14 @@ export default function GerarContratoTab({ templates, onContratoGerado }: GerarC
 
   async function handlePreencherIA() {
     if (!template) {
-      toast({ title: "Selecione um template", variant: "destructive" });
+      toast({ title: "Selecione um modelo", variant: "destructive" });
       return;
     }
 
     const today = format(new Date(), "dd/MM/yyyy");
     const lines: string[] = [];
     lines.push(`Data atual: ${today}`);
-    lines.push(`Imobiliária: ${config.nome_imobiliaria || config.nome_plataforma || "Vision AI"}`);
+    lines.push(`Imobiliária: ${config.nome_imobiliaria || config.nome_plataforma || "Imobiliária"}`);
     if (config.cnpj) lines.push(`CNPJ: ${config.cnpj}`);
     if (config.telefone_suporte) lines.push(`Telefone: ${config.telefone_suporte}`);
     if (config.email_suporte) lines.push(`Email: ${config.email_suporte}`);
@@ -139,7 +160,10 @@ export default function GerarContratoTab({ templates, onContratoGerado }: GerarC
       const { data, error } = await supabase.functions.invoke("fill-contract", {
         body: {
           action: "fill_contract",
+          // For PDF templates, also send pdf_url so the edge function can
+          // extract the text server-side if conteudo_template is a placeholder
           template_content: template.conteudo_template,
+          pdf_url: isPdfTemplate(template) ? (template.pdf_url || null) : null,
           messages: [{ role: "user", content: lines.join("\n") }],
         },
       });
@@ -172,12 +196,13 @@ export default function GerarContratoTab({ templates, onContratoGerado }: GerarC
       toast({ title: "Preencha com IA antes de salvar", variant: "destructive" });
       return;
     }
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return;
+
     setSaving(true);
     try {
       const { error } = await supabase.from("contratos_gerados").insert({
-        user_id: user.id,
+        user_id: session.user.id,
         template_id: template?.id || null,
         lead_id: lead?.id || null,
         nome_cliente: lead?.nome || "Cliente",
@@ -200,17 +225,17 @@ export default function GerarContratoTab({ templates, onContratoGerado }: GerarC
     setSaving(false);
   }
 
-  // Count remaining unfilled fields
   const unfilledCount = (contractFilled.match(/\{\{[^}]+\}\}/g) || []).length;
+  const showPdfPreview = template && isPdfTemplate(template) && template.pdf_url && !contractFilled;
 
   return (
     <div className="space-y-4">
       {/* Selectors */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div>
-          <label className="text-xs font-medium text-muted-foreground mb-1 block">Template *</label>
+          <label className="text-xs font-medium text-muted-foreground mb-1 block">Modelo *</label>
           <Select value={selectedTemplate} onValueChange={(v) => { setSelectedTemplate(v); setContractFilled(""); }}>
-            <SelectTrigger><SelectValue placeholder="Selecione o tipo de contrato" /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Selecione o modelo de contrato" /></SelectTrigger>
             <SelectContent>
               {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>)}
             </SelectContent>
@@ -272,7 +297,7 @@ export default function GerarContratoTab({ templates, onContratoGerado }: GerarC
         <Card className="glass-card">
           <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <Sparkles className="h-12 w-12 mb-4 opacity-40" />
-            <p className="text-sm">Selecione um template para começar.</p>
+            <p className="text-sm">Selecione um modelo para começar.</p>
             <p className="text-xs mt-1 text-muted-foreground/70">
               A IA irá preencher automaticamente os dados do imóvel, cliente e imobiliária.
             </p>
@@ -301,7 +326,10 @@ export default function GerarContratoTab({ templates, onContratoGerado }: GerarC
               <div className="flex items-center gap-2">
                 <FileText className="h-4 w-4 text-primary" />
                 <span className="text-sm font-medium">
-                  {contractFilled ? "Contrato Preenchido" : "Preview do Template"}
+                  {contractFilled
+                    ? "Contrato Preenchido"
+                    : `Modelo: ${template.nome}${template.arquivo_tipo ? ` (${template.arquivo_tipo.toUpperCase()})` : ""}`
+                  }
                 </span>
               </div>
               {contractFilled && (
@@ -322,14 +350,27 @@ export default function GerarContratoTab({ templates, onContratoGerado }: GerarC
                 </div>
               )}
             </div>
-            <ScrollArea className="h-[480px]">
-              <div className="p-4 text-sm leading-relaxed font-mono whitespace-pre-wrap bg-white dark:bg-muted/10 min-h-[480px]">
-                {contractFilled
-                  ? renderPreview(contractFilled)
-                  : renderPreview(template.conteudo_template)
-                }
+
+            {showPdfPreview ? (
+              /* PDF preview via iframe */
+              <div className="h-[480px] bg-muted/10">
+                <iframe
+                  src={template.pdf_url!}
+                  title={template.nome}
+                  className="w-full h-full rounded-b-md"
+                  style={{ border: "none" }}
+                />
               </div>
-            </ScrollArea>
+            ) : (
+              <ScrollArea className="h-[480px]">
+                <div className="p-4 text-sm leading-relaxed font-mono whitespace-pre-wrap bg-white dark:bg-muted/10 min-h-[480px]">
+                  {contractFilled
+                    ? renderPreview(contractFilled)
+                    : renderPreview(template.conteudo_template)
+                  }
+                </div>
+              </ScrollArea>
+            )}
           </Card>
 
           {contractFilled && unfilledCount === 0 && (
