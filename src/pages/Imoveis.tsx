@@ -1,7 +1,10 @@
 import { useState, useMemo } from "react";
 import { useImoveis, Imovel } from "@/hooks/useImoveis";
+import { supabase } from "@/integrations/supabase/client";
 import { ImovelCard } from "@/components/imoveis/ImovelCard";
 import { ImovelFormDialog } from "@/components/imoveis/ImovelFormDialog";
+import ImportImoveisModal from "@/components/imoveis/ImportImoveisModal";
+import UploadFotosImoveisModal from "@/components/imoveis/UploadFotosImoveisModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
-import { Home, Plus, LayoutGrid, List, Search, X, Pencil, Scale, CheckSquare, Square } from "lucide-react";
+import { Home, Plus, LayoutGrid, List, Search, X, Pencil, Scale, CheckSquare, Square, FileSpreadsheet, Images } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 
@@ -25,10 +28,21 @@ const statusLabels: Record<string, string> = {
   inativo: "Inativo",
 };
 
+interface ImovelSemFoto {
+  id: string;
+  codigo: string | null;
+  titulo: string | null;
+  tipo: string;
+  bairro: string | null;
+}
+
 export default function Imoveis() {
   const [view, setView] = useState<"grid" | "list">("grid");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Imovel | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [fotosOpen, setFotosOpen] = useState(false);
+  const [imovelsSemFoto, setImovelsSemFoto] = useState<ImovelSemFoto[]>([]);
 
   const [filters, setFilters] = useState({
     tipo: "",
@@ -65,6 +79,20 @@ export default function Imoveis() {
   const openEdit = (imovel: Imovel) => {
     setEditing(imovel);
     setDialogOpen(true);
+  };
+
+  const handleImported = async (ids: string[]) => {
+    refetch();
+    if (ids.length === 0) return;
+    // Fetch imported imoveis to check which have no photos
+    const { data } = await supabase
+      .from("imoveis")
+      .select("id, codigo, titulo, tipo, bairro, fotos")
+      .in("id", ids);
+    const semFoto = (data || []).filter((i: { fotos: string[] }) => !i.fotos || i.fotos.length === 0);
+    if (semFoto.length > 0) {
+      setImovelsSemFoto(semFoto as ImovelSemFoto[]);
+    }
   };
 
   const clearFilters = () => setFilters({ tipo: "", finalidade: "", status: "", busca: "" });
@@ -116,6 +144,10 @@ export default function Imoveis() {
             onClick={() => setView(view === "grid" ? "list" : "grid")}
           >
             {view === "grid" ? <List className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
+          </Button>
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            Importar em Lote
           </Button>
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4 mr-2" />
@@ -183,6 +215,25 @@ export default function Imoveis() {
         )}
       </div>
 
+      {/* Banner: fotos pós-importação */}
+      {imovelsSemFoto.length > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
+          <Images className="h-5 w-5 text-primary shrink-0" />
+          <p className="text-sm flex-1">
+            Você importou <span className="font-semibold">{imovelsSemFoto.length} imóvel{imovelsSemFoto.length !== 1 ? "is" : ""}</span> sem fotos. Deseja adicionar fotos agora?
+          </p>
+          <div className="flex gap-2 shrink-0">
+            <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => setImovelsSemFoto([])}>
+              Agora não
+            </Button>
+            <Button size="sm" className="text-xs h-7 gap-1" onClick={() => setFotosOpen(true)}>
+              <Images className="h-3.5 w-3.5" />
+              Adicionar Fotos
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Stats rápidas */}
       <div className="flex gap-2 flex-wrap">
         {["disponivel", "reservado", "vendido", "alugado"].map((s) => {
@@ -243,6 +294,19 @@ export default function Imoveis() {
         onOpenChange={setDialogOpen}
         imovel={editing}
         onSaved={refetch}
+      />
+
+      <ImportImoveisModal
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={handleImported}
+      />
+
+      <UploadFotosImoveisModal
+        open={fotosOpen}
+        onOpenChange={setFotosOpen}
+        imoveis={imovelsSemFoto}
+        onDone={() => { setImovelsSemFoto([]); refetch(); }}
       />
 
       {/* Comparator Dialog */}
