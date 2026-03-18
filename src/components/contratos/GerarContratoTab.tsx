@@ -16,6 +16,8 @@ interface Template {
   nome: string;
   tipo: string;
   conteudo_template: string;
+  pdf_url?: string | null;
+  arquivo_tipo?: string | null;
   placeholders: any;
 }
 
@@ -130,7 +132,7 @@ export default function GerarContratoTab({ templates, onContratoGerado }: GerarC
       if (lead.telefone) lines.push(`- Telefone: ${lead.telefone}`);
     }
 
-    lines.push(`\nInstruções: Preencha TODOS os {{campos}} do template com os dados acima. Para campos sem dados disponíveis, mantenha o placeholder {{campo}}. Retorne SOMENTE o contrato preenchido entre as tags <contrato> e </contrato>, sem nenhum texto adicional fora das tags.`);
+    lines.push(`\nInstruções: Preencha TODOS os campos em branco do contrato com os dados fornecidos acima. Campos em branco incluem: {{placeholders}}, espaços com ___, [CAMPO], (campo), etc. Para campos sem dados disponíveis, mantenha o espaço original. Formate valores monetários como R$ 1.000,00 e datas como dd/MM/yyyy. Retorne SOMENTE o contrato preenchido entre as tags <contrato> e </contrato>, sem nenhum texto adicional fora das tags.`);
 
     setLoading(true);
     try {

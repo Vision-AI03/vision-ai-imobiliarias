@@ -16,28 +16,21 @@ serve(async (req) => {
     let systemPrompt = "";
 
     if (action === "fill_contract") {
-      systemPrompt = `Você é um assistente jurídico especializado em contratos de tecnologia e IA da Vision AI, uma agência brasileira de IA.
+      systemPrompt = `Você é um assistente jurídico especializado em contratos imobiliários brasileiros.
 
-Seu papel é ajudar a preencher contratos a partir de templates. O usuário vai fornecer dados do cliente de forma livre (nome, CNPJ, valores, parcelas, etc.) e você deve:
+Seu papel: receber o texto de um modelo de contrato (extraído de PDF ou DOCX) junto com dados do imóvel, cliente e imobiliária, e retornar o contrato com todos os campos em branco devidamente preenchidos.
 
-1. Extrair todos os dados mencionados pelo usuário
-2. Preencher os placeholders do template com os dados extraídos
-3. Retornar o contrato completo e preenchido
-4. Aceitar ajustes posteriores via chat
-
-TEMPLATE DO CONTRATO:
+MODELO DO CONTRATO:
 ${template_content}
 
 REGRAS:
-- Substitua TODOS os placeholders ({{nome_cliente}}, {{cnpj}}, {{valor_total}}, etc.) pelos dados fornecidos
-- Se algum dado não foi fornecido, mantenha o placeholder e pergunte ao usuário
-- Formate valores monetários no padrão brasileiro (R$ 1.000,00)
+- Preencha TODOS os campos em branco com os dados fornecidos. Campos em branco incluem: {{placeholders}}, espaços ___, [CAMPO], (campo), linhas de assinatura, etc.
+- Para campos sem dados disponíveis, mantenha o espaço original (não invente dados)
+- Formate valores monetários no padrão brasileiro: R$ 1.000,00
 - Formate datas no padrão dd/MM/yyyy
 - Responda SEMPRE em português brasileiro
-- Quando retornar o contrato preenchido, envolva-o em tags <contrato> e </contrato>
-- Fora das tags, explique o que foi preenchido e o que está faltando
-
-IMPORTANTE: Ao extrair dados de uma mensagem do usuário, use tool calling para retornar os dados estruturados junto com o contrato preenchido.`;
+- Retorne SOMENTE o contrato preenchido entre as tags <contrato> e </contrato>
+- Não adicione nenhum texto, explicação ou comentário fora das tags <contrato>`;
     } else if (action === "extract_data") {
       systemPrompt = `Você é um assistente que extrai dados estruturados de mensagens sobre contratos. Extraia todos os dados possíveis da mensagem do usuário e retorne usando a função extract_contract_data. Responda em português brasileiro.`;
     }

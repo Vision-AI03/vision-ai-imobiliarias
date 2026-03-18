@@ -80,7 +80,7 @@ export default function Contratos() {
                 <FileText className="h-12 w-12 text-muted-foreground/30 mb-3" />
                 <p className="text-muted-foreground">Nenhum modelo cadastrado ainda.</p>
                 <p className="text-xs text-muted-foreground/70 mt-1">
-                  Crie um modelo na aba "Modelos" antes de usar o Preencher com IA.
+                  Faça upload de um modelo na aba "Modelos" antes de usar o Preencher com IA.
                 </p>
                 <Button
                   size="sm"
