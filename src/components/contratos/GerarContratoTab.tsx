@@ -39,7 +39,6 @@ interface Imovel {
   valor_aluguel: number | null;
   matricula: string | null;
   cartorio_registro: string | null;
-  corretor?: { nome: string; creci: string | null } | null;
 }
 
 interface GerarContratoTabProps {
@@ -99,7 +98,7 @@ export default function GerarContratoTab({ templates, onContratoGerado }: GerarC
         .limit(200),
       supabase
         .from("imoveis")
-        .select("id, titulo, tipo, endereco, bairro, cidade, valor_venda, valor_aluguel, matricula, cartorio_registro, corretor:corretores(nome, creci)")
+        .select("id, titulo, tipo, endereco, bairro, cidade, valor_venda, valor_aluguel, matricula, cartorio_registro")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(200),
@@ -143,7 +142,6 @@ export default function GerarContratoTab({ templates, onContratoGerado }: GerarC
       if (imovel.cartorio_registro) lines.push(`- Cartório: ${imovel.cartorio_registro}`);
       if (imovel.valor_venda) lines.push(`- Valor de venda: R$ ${imovel.valor_venda.toLocaleString("pt-BR")}`);
       if (imovel.valor_aluguel) lines.push(`- Valor de aluguel: R$ ${imovel.valor_aluguel.toLocaleString("pt-BR")}/mês`);
-      if (imovel.corretor?.nome) lines.push(`- Corretor: ${imovel.corretor.nome}${imovel.corretor.creci ? ` (CRECI: ${imovel.corretor.creci})` : ""}`);
     }
 
     if (lead) {
@@ -252,7 +250,7 @@ export default function GerarContratoTab({ templates, onContratoGerado }: GerarC
               <SelectItem value="__none__">Sem imóvel vinculado</SelectItem>
               {imoveis.map(i => (
                 <SelectItem key={i.id} value={i.id}>
-                  {i.titulo || i.tipo} — {i.endereco || i.bairro || "Sem endereço"}
+                  {i.titulo || i.tipo}{(i.bairro || i.cidade) ? ` — ${[i.bairro, i.cidade].filter(Boolean).join(", ")}` : ""}
                 </SelectItem>
               ))}
             </SelectContent>
